@@ -20,6 +20,7 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
+
 if (TETMAG_FIND_CUDA_ARCH)
   include(FindCUDA/select_compute_arch)
   CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_STRING1)
@@ -51,8 +52,6 @@ endforeach()
   string(APPEND NVCC_FLAGS " -Wno-deprecated-gpu-targets; ")
   find_package(CUDAToolkit REQUIRED)
   list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS})
- 
-  set(CMAKE_CUDA_STANDARD 11)
 
   list(APPEND CUDA_NVCC_FLAGS " -w;")
   # message(STATUS "NVCC_FLAGS: " ${CUDA_NVCC_FLAGS})

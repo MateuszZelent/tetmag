@@ -21,7 +21,6 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 cmake_minimum_required(VERSION 3.13)
-set(CMAKE_CXX_STANDARD 14)
 
 project(tetmag VERSION 1.7.7 LANGUAGES C CXX)
 # These options can be set with ccmake or with cmake -D 
@@ -34,10 +33,22 @@ set(TETMAG_HOST_COMPILER "/usr/bin/g++" CACHE FILEPATH "CUDA-compatible host com
 # ^^^ select host compiler version compatible with the installed CUDA version.
 # (see https://gist.github.com/ax3l/9489132 )
 
+# Installation prefix
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation prefix" FORCE)
+endif()
+set(INSTALL_BIN_DIR "bin" CACHE PATH "")
+set(INSTALL_LIB_DIR "lib" CACHE PATH "")
+set(INSTALL_LIB_SUBDIR "lib/tetmag" CACHE PATH "")
+
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckLanguage)
 check_language(CUDA)
 if (CMAKE_CUDA_COMPILER)
+  set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_HOST_COMPILER ${TETMAG_HOST_COMPILER} )  
   enable_language(CUDA)
 endif(CMAKE_CUDA_COMPILER)
@@ -127,8 +138,7 @@ add_definitions(-DUSE_NETCDF)
 find_package(BLAS)
 find_package(LAPACK REQUIRED)
 
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBDIR})
 
 set(PREPROC ${PROJECT_SOURCE_DIR}/preproc/)
 set(UTILS ${PROJECT_SOURCE_DIR}/utils/)
@@ -154,8 +164,7 @@ set (PREPROC_FILES
   ${PREPROC}LindholmCWrapper.cpp  
 )
 
-file(GLOB PREPROC_SRC ${PREPROC_FILES})
-add_library(prep STATIC ${PREPROC_SRC})
+add_library(prep STATIC ${PREPROC_FILES})
 set(PREPLIB prep)
 target_link_libraries(${PREPLIB} VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
 
@@ -189,24 +198,24 @@ if (USE_CUDA)
   set (CVODE_CUDA sundials_nveccuda)
 	cuda_add_executable(${PROJECT_NAME} ${TETMAG_FILES} ${CUDA_FILES})
   target_include_directories(${PROJECT_NAME} PUBLIC ${CUDA_INCLUDE_DIRS})  
-	target_link_libraries(${PROJECT_NAME} CUDA::cudart CUDA::cusparse ${CVODE_CUDA})	
+	target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart CUDA::cusparse ${CVODE_CUDA})
 else()
  	 add_executable(${PROJECT_NAME} ${TETMAG_FILES} )
 endif(USE_CUDA)	
 
 add_dependencies(${PROJECT_NAME} amgcl sundials_cvode gmsh h2lib)
-target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
-target_link_libraries(${PROJECT_NAME} Threads::Threads)
-target_link_libraries(${PROJECT_NAME} Boost::boost Boost::filesystem Boost::program_options Boost::system Boost::thread)
-target_link_libraries(${PROJECT_NAME} ${H2LIB} ${GMSHLIB} ${CVODELIB})
-target_link_libraries(${PROJECT_NAME} VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
-target_link_libraries(${PROJECT_NAME} ${PREPLIB} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${NCDF})
+target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+target_link_libraries(${PROJECT_NAME} PRIVATE Boost::filesystem Boost::program_options Boost::system Boost::thread)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${H2LIB} ${GMSHLIB} ${CVODELIB})
+target_link_libraries(${PROJECT_NAME} PRIVATE VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${NCDF})
 
 if(USE_OpenMP)
- 	target_link_libraries( ${PROJECT_NAME} OpenMP::OpenMP_CXX ) 
+ 	target_link_libraries( ${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX )
   set (CVODE_OMP sundials_nvecopenmp)
 	add_dependencies(${PROJECT_NAME} ${CVODE_OMP})
-	target_link_libraries(${PROJECT_NAME} ${CVODE_OMP})
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${CVODE_OMP})
 endif(USE_OpenMP)	
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
@@ -215,3 +224,43 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${EIGEN3_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${EXTDIR}/gmsh/include>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${EXTDIR}/h2lib/Library>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${amgcl_SOURCE_DIR}>)
+
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}"
+    BUILD_WITH_INSTALL_RPATH FALSE
+)
+
+# Installation
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION ${INSTALL_BIN_DIR}
+)
+
+# Manifest
+install(CODE "file(WRITE ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_BIN_DIR}/tetmag\\n\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_DIR}/libprep.a\\n\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libgmsh.so.4.14\\n\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libh2.a\\n\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_cvode.a\\n\")")
+if(USE_CUDA)
+    install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nveccuda.a\\n\")")
+endif()
+if(USE_OpenMP)
+    install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nvecopenmp.a\\n\")")
+endif()
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"\${HEADER_FILES}\")")
+
+# Uninstall
+if(NOT TARGET uninstall)
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -E echo "Uninstalling tetmag..."
+        COMMAND xargs rm -f < ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
+        COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
+        COMMAND find ${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR} -type d -empty -delete
+        COMMAND find ${CMAKE_INSTALL_PREFIX}/share/tetmag -type d -empty -delete
+        COMMAND ${CMAKE_COMMAND} -E echo "Uninstallation complete."
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Uninstalling tetmag files."
+    )
+endif()

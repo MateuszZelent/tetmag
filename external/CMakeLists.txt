@@ -23,7 +23,6 @@
 ################################################################################
 # Install H2Lib
 
-
 if (USE_OpenMP) 
   set (H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
     ${EXTDIR}/h2config/options.inc.omp
@@ -63,6 +62,7 @@ add_custom_command(
 add_library(h2 SHARED IMPORTED)
 set_target_properties(h2 PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libh2.a)
 set(H2LIB h2)
+install(FILES ${LIBDIR}/libh2.a DESTINATION ${INSTALL_LIB_SUBDIR})
 
 ###############################################################################
 # Istall AMGCL
@@ -84,7 +84,6 @@ FetchContent_MakeAvailable(amgcl)
 # Install CVODE
 
 include(FetchContent)
-find_package(LAPACK REQUIRED)
 
 if(TETMAG_USE_CVODE_5)   
     FetchContent_Declare(
@@ -103,7 +102,9 @@ else()
         GIT_PROGRESS true
     )
 endif()
-
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
+set(SUNDIALS_BUILD_STATIC_LIBS ON CACHE BOOL "Build static libs" FORCE)
+set(SUNDIALS_BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared libs" FORCE)
 set(SUNDIALS_ENABLE_LAPACK ON CACHE BOOL "" FORCE)
 set(ENABLE_LAPACK ON CACHE BOOL "" FORCE)
 set(SUNDIALS_LAPACK_LIBRARIES "${LAPACK_LIBRARIES}" CACHE STRING "" FORCE)
@@ -134,7 +135,22 @@ set(EXAMPLES_ENABLE_C OFF CACHE BOOL "")
 set(EXAMPLES_INSTALL OFF CACHE BOOL "")
 
 FetchContent_MakeAvailable(cvode)
+add_compile_options(-Wno-reorder)
 set(CVODELIB sundials_cvode)
+
+install(FILES ${LIBDIR}/libsundials_cvode.a
+    DESTINATION ${INSTALL_LIB_SUBDIR}
+)
+if(USE_CUDA)
+    install(FILES ${LIBDIR}/libsundials_nveccuda.a
+        DESTINATION ${INSTALL_LIB_SUBDIR}
+    )
+endif()
+if(USE_OpenMP)
+    install(FILES ${LIBDIR}/libsundials_nvecopenmp.a
+        DESTINATION ${INSTALL_LIB_SUBDIR}
+    )
+endif()
 
 ###############################################################################
 # Intall GMSH
@@ -153,11 +169,9 @@ if(APPLE)
   else()
    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSX-sdk.tgz")
   endif()
-endif(APPLE)
-
-if(UNIX AND NOT APPLE)
+elseif(UNIX)
   set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/Linux/gmsh-git-Linux64-sdk.tgz")
-endif(UNIX AND NOT APPLE)
+endif()
 
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
@@ -182,10 +196,12 @@ add_custom_command(
 add_library(gmsh_lib SHARED IMPORTED)
 if (APPLE)
    set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.dylib)
-endif(APPLE)
-if (UNIX AND NOT APPLE)
+elseif (UNIX)
    set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.so)
-endif(UNIX AND NOT APPLE)
+endif()
 set(GMSHLIB gmsh_lib)
+
+install(FILES ${LIBDIR}/libgmsh.so.4.14 DESTINATION ${INSTALL_LIB_SUBDIR})
+
 ################################################################################
 

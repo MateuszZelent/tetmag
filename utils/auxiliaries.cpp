@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -155,7 +155,7 @@ std::string toLower(std::string s) {
 
 
 void printTetmagVersion() {
-	std::cout << "This is tetmag v"	<< TETMAG_VERSION_MAJOR << "." << TETMAG_VERSION_MINOR << "." << TETMAG_VERSION_PATCH << std::endl;
+	std::cout << "Version " << TETMAG_VERSION_MAJOR << "." << TETMAG_VERSION_MINOR << "." << TETMAG_VERSION_PATCH << std::endl;
 };
 
 

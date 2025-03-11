@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -48,7 +48,7 @@
 using namespace Eigen;
 
 int main(int argc, char *argv[]) {
-  std::cout << "tetmag - Copyright (C) 2016-2023 CNRS and Université de Strasbourg\n"
+  std::cout << "tetmag - Copyright (C) 2016-2025 CNRS and Université de Strasbourg\n"
     "Author: Riccardo Hertel\n"
     "This program comes with ABSOLUTELY NO WARRANTY;\n" 
 	"This is free software, and you are welcome to redistribute it\n"

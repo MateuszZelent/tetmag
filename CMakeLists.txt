@@ -22,7 +22,7 @@
 #
 cmake_minimum_required(VERSION 3.13)
 
-project(tetmag VERSION 1.7.7 LANGUAGES C CXX)
+project(tetmag VERSION 1.7.8 LANGUAGES C CXX)
 # These options can be set with ccmake or with cmake -D 
 option(TETMAG_USE_OPENMP "Compile with OpenMP" ON)
 option(TETMAG_USE_CUDA "Enable CUDA" ON)
@@ -226,10 +226,17 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${EXTDIR}/h2
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${amgcl_SOURCE_DIR}>)
 
 
-set_target_properties(${PROJECT_NAME} PROPERTIES
+if(APPLE)
+   set_target_properties(${PROJECT_NAME} PROPERTIES
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR};/usr/local/lib/"
+    BUILD_WITH_INSTALL_RPATH TRUE
+   )
+else()
+ set_target_properties(${PROJECT_NAME} PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}"
     BUILD_WITH_INSTALL_RPATH FALSE
-)
+ )
+endif()
 
 # Installation
 install(TARGETS ${PROJECT_NAME}
@@ -240,7 +247,7 @@ install(TARGETS ${PROJECT_NAME}
 install(CODE "file(WRITE ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_BIN_DIR}/tetmag\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_DIR}/libprep.a\\n\")")
-install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libgmsh.so.4.14\\n\")")
+install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${GMSH_LIB_VERSION}\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libh2.a\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_cvode.a\\n\")")
 if(USE_CUDA)

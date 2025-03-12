@@ -23,22 +23,29 @@
 ################################################################################
 # Install H2Lib
 
-if (USE_OpenMP) 
+if (USE_OpenMP)
   set (H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
     ${EXTDIR}/h2config/options.inc.omp
     ${EXTDIR}/h2lib/options.inc.default
     )
-Else()
+else()
   set (H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
     ${EXTDIR}/h2config/options.inc.serial
     ${EXTDIR}/h2lib/options.inc.default
     )
 endif()
 
+
 if (APPLE)
-  set(H2CONFIG ${H2CONFIG} && ${CMAKE_COMMAND} -E copy 
-    ${EXTDIR}/h2lib/system.inc.macos 
-    ${EXTDIR}/h2lib/system.inc.linux
+   if (USE_OpenMP)
+    set (H2_CONFIG_FILE ${EXTDIR}/h2config/system.inc.macos)
+   else()
+    set (H2_CONFIG_FILE ${EXTDIR}/h2lib/system.inc.macos)
+   endif()
+
+   set(H2CONFIG ${H2CONFIG} && ${CMAKE_COMMAND} -E copy
+     ${H2_CONFIG_FILE}
+     ${EXTDIR}/h2lib/system.inc.linux
   )
 endif()
 
@@ -201,7 +208,13 @@ elseif (UNIX)
 endif()
 set(GMSHLIB gmsh_lib)
 
-install(FILES ${LIBDIR}/libgmsh.so.4.14 DESTINATION ${INSTALL_LIB_SUBDIR})
+if(APPLE)
+  file(GLOB GMSH_LIB_VERSION "${LIBDIR}/libgmsh.*.dylib")
+  install(FILES ${GMSH_LIB_VERSION} DESTINATION ${INSTALL_LIB_SUBDIR})
+else()
+  file(GLOB GMSH_LIB_VERSION "${LIBDIR}/libgmsh.so.*")
+  install(FILES ${GMSH_LIB_VERSION} DESTINATION ${INSTALL_LIB_SUBDIR})
+endif()
 
 ################################################################################
 

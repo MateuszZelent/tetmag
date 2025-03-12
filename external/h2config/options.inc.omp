@@ -24,7 +24,7 @@ BRIEF_OUTPUT=1
 #USE_THREADSAFE_LAPACK=1
 
 # Use SIMD-instructions for compute intense tasks
-USE_SIMD=1
+# USE_SIMD=1
 
 # Precompute quadrature points on every triangle for BEM applications
 #USE_TRIQUADPOINTS=1

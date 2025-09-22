@@ -22,7 +22,7 @@
 #
 cmake_minimum_required(VERSION 3.13)
 
-project(tetmag VERSION 1.7.8 LANGUAGES C CXX)
+project(tetmag VERSION 1.7.9 LANGUAGES C CXX)
 # These options can be set with ccmake or with cmake -D 
 option(TETMAG_USE_OPENMP "Compile with OpenMP" ON)
 option(TETMAG_USE_CUDA "Enable CUDA" ON)
@@ -135,8 +135,8 @@ find_package(VTK REQUIRED COMPONENTS CommonCore CommonDataModel IOXML IOLegacy)
 find_library(NCDF netcdf REQUIRED)
 add_definitions(-DUSE_NETCDF)
 
-find_package(BLAS)
-find_package(LAPACK REQUIRED)
+# find_package(BLAS)
+# find_package(LAPACK REQUIRED)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBDIR})
 
@@ -209,7 +209,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::filesystem Boost::program_options Boost::system Boost::thread)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${H2LIB} ${GMSHLIB} ${CVODELIB})
 target_link_libraries(${PROJECT_NAME} PRIVATE VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${NCDF})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${NCDF})
 
 if(USE_OpenMP)
  	target_link_libraries( ${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX )

@@ -20,7 +20,7 @@ BRIEF_OUTPUT=1
 # USE_BLAS=1
 
 # State if a thread-safe version of LAPACK is used or not
- USE_THREADSAFE_LAPACK=1
+# USE_THREADSAFE_LAPACK=1
 
 # Use SIMD-instructions for compute intense tasks
 # USE_SIMD=1

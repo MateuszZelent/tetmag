@@ -135,9 +135,6 @@ find_package(VTK REQUIRED COMPONENTS CommonCore CommonDataModel IOXML IOLegacy)
 find_library(NCDF netcdf REQUIRED)
 add_definitions(-DUSE_NETCDF)
 
-# find_package(BLAS)
-# find_package(LAPACK REQUIRED)
-
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBDIR})
 
 set(PREPROC ${PROJECT_SOURCE_DIR}/preproc/)
@@ -149,6 +146,14 @@ set(GPU ${PROJECT_SOURCE_DIR}/gpu/)
 
 if (USE_CUDA)   	
   include(${GPU}/CMakeLists.txt)
+  add_library(cuda_cccl_includes INTERFACE)
+  target_include_directories(cuda_cccl_includes INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
+
+  foreach(root IN LISTS CUDAToolkit_INCLUDE_DIRS)
+    if (IS_DIRECTORY "${root}/cccl")
+      target_include_directories(cuda_cccl_includes INTERFACE "${root}/cccl")
+    endif()
+  endforeach()
 endif(USE_CUDA)
 
 include(${EXTDIR}/CMakeLists.txt)   # install external dependencies
@@ -196,11 +201,11 @@ set (TETMAG_FILES
  
 if (USE_CUDA) 
   set (CVODE_CUDA sundials_nveccuda)
-	cuda_add_executable(${PROJECT_NAME} ${TETMAG_FILES} ${CUDA_FILES})
-  target_include_directories(${PROJECT_NAME} PUBLIC ${CUDA_INCLUDE_DIRS})  
-	target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart CUDA::cusparse ${CVODE_CUDA})
+  cuda_add_executable(${PROJECT_NAME} ${TETMAG_FILES} ${CUDA_FILES})
+  target_link_libraries(${PROJECT_NAME} PRIVATE cuda_cccl_includes)
+  target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart CUDA::cusparse ${CVODE_CUDA})
 else()
- 	 add_executable(${PROJECT_NAME} ${TETMAG_FILES} )
+  add_executable(${PROJECT_NAME} ${TETMAG_FILES})
 endif(USE_CUDA)	
 
 add_dependencies(${PROJECT_NAME} amgcl sundials_cvode gmsh h2lib)
@@ -212,7 +217,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE VTK::CommonCore VTK::CommonDataMod
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${NCDF})
 
 if(USE_OpenMP)
- 	target_link_libraries( ${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX )
+ 	target_link_libraries( ${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
   set (CVODE_OMP sundials_nvecopenmp)
 	add_dependencies(${PROJECT_NAME} ${CVODE_OMP})
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${CVODE_OMP})

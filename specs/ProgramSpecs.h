@@ -169,15 +169,13 @@ public:
 	double beta;
 	double theta_j;
 	double phi_j;
-	bool useSTT;
-	bool integrateOnGPU;
+	bool useSTT;	
 	bool useHyst;
 	double firstField, lastField;
 	double hystPhi, hystTheta;
 	double hystStart, hystEnd, deltaH;
 	Hlocal hl;
-	double cgTol;
-	bool useCVODE;
+	double cgTol;	
 	bool showTimer;
 	double gamma;
 };

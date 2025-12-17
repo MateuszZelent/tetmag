@@ -101,8 +101,7 @@ void ProgramSpecs::initialize() {
 			("stt dynamics", opt::value<bool>()->default_value(false), "use STT term in dynamic calculation [yes /no]")
 			("current pulse", opt::value<bool>()->default_value(false), "is the current applied as a pulse?")
 			("current pulse duration", opt::value<double>()->default_value(1.), "time width of Gaussian current pulse in ps")
-			("current pulse delay", opt::value<double>()->default_value(0.), "time in ps at which Gaussian current pulse reaches maximum value")
-			("integrate on GPU",  opt::value<bool>()->default_value(true), "perform LLG integration on GPU instead of parallel CPU [yes /no]")
+			("current pulse delay", opt::value<double>()->default_value(0.), "time in ps at which Gaussian current pulse reaches maximum value")			
 			("preconditioner", opt::value<std::string>()->default_value("ILU"), "preconditioner for GPU CG solver: ILU, MCILU, GS, MCGS")
 			("current type", opt::value<std::string>()->default_value("none"), "options: PULSE, DC, or NONE")
 			("local field", opt::value<std::string>()->default_value("none"), "application of local field: NONE, PULSE, SINE, CONST")
@@ -116,8 +115,7 @@ void ProgramSpecs::initialize() {
 			("field step", opt::value<double>()->default_value(0.), "increment or decrement size in hysteresis [mT]")
 			("hys theta", opt::value<double>()->default_value(0.), "polar angle of hysteresis field direction [degs]")
 			("hys phi", opt::value<double>()->default_value(0.), "azimuthal angle of hysteresis field direction [degs]")
-			("device number", opt::value<int>()->default_value(0), "identifier of GPU device in the case of multiple GPUs")
-			("use CVODE", opt::value<bool>()->default_value(false), "select CVODE integrator (instead of ODEINT)")
+			("device number", opt::value<int>()->default_value(0), "identifier of GPU device in the case of multiple GPUs")			
 			("timer output", opt::value<bool>()->default_value(false), "display amount of time spent in individual parts of the code")
 			("gamma", opt::value<double>()->default_value(PhysicalConstants::gamma0), "gyromagnetic")
 			;
@@ -233,7 +231,6 @@ void ProgramSpecs::readFile() {
 	if (vm.count("current theta")) theta_j = vm["current theta"].as<double>();
 	if (vm.count("current phi")) phi_j = vm["current phi"].as<double>();
 	if (vm.count("stt dynamics")) useSTT = vm["stt dynamics"].as<bool>();
-	if (vm.count("integrate on GPU")) integrateOnGPU = vm["integrate on GPU"].as<bool>();
 	if (vm.count("preconditioner")) preconditionerType = toLower(vm["preconditioner"].as<std::string>());
 	if (vm.count("current pulse")) pulsedSTT = vm["current pulse"].as<bool>();
 	if (vm.count("current pulse delay")) sttPulseDelay = vm["current pulse delay"].as<double>();
@@ -250,8 +247,7 @@ void ProgramSpecs::readFile() {
 	if (vm.count("hys theta")) hystTheta = vm["hys theta"].as<double>();
 	if (vm.count("hys phi")) hystPhi = vm["hys phi"].as<double>();
 	if (vm.count("field step")) deltaH = vm["field step"].as<double>();
-	if (vm.count("device number")) deviceNumber = vm["device number"].as<int>();
-	if (vm.count("use CVODE"))useCVODE = vm["use CVODE"].as<bool>();
+	if (vm.count("device number")) deviceNumber = vm["device number"].as<int>();	
 	if (vm.count("timer output"))showTimer = vm["timer output"].as<bool>();
 	if (vm.count("gamma"))gamma=vm["gamma"].as<double>();
 

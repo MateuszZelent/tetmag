@@ -28,39 +28,27 @@ if (TETMAG_FIND_CUDA_ARCH)
   string(STRIP "${INSTALLED_GPU_STRING1}" INSTALLED_GPU_STRING2)
   string(REPLACE " " ";" INSTALLED_GPU_STRING3 "${INSTALLED_GPU_STRING2}")
   string(REPLACE "." "" INSTALLED_GPU_ARCHS "${INSTALLED_GPU_STRING3}")
-  LIST(APPEND GPU_ARCHITECTURES ${INSTALLED_GPU_ARCHS})
-  string(TOLOWER ${INSTALLED_GPU_STRING1} ptx_check)
+  set(GPU_ARCHITECTURES ${INSTALLED_GPU_ARCHS})
 
-  string(FIND ${ptx_check} "ptx" ptx_pos) # this string appears in select_compute_arch if no GPU is found
-  if (NOT ptx_pos EQUAL -1) # FIND returns a value of -1 if the string is not found.
+  string(TOLOWER "${INSTALLED_GPU_STRING1}" ptx_check)
+  string(FIND "${ptx_check}" "ptx" ptx_pos)
+  if (NOT ptx_pos EQUAL -1)
     message(SEND_ERROR "ERROR: No CUDA capable device found.")
-    set (USE_CUDA OFF)
-  endif() 
-   message(STATUS "Detected GPU architectures: ${INSTALLED_GPU_STRING2}")
-else(TETMAG_FIND_CUDA_ARCH)
-   set (GPU_ARCHITECTURES ${TETMAG_SET_CUDA_ARCHS})
-endif(TETMAG_FIND_CUDA_ARCH)
+    set(USE_CUDA OFF)
+  endif()
 
+  message(STATUS "Detected GPU architectures: ${INSTALLED_GPU_STRING2}")
+else()
+  set(GPU_ARCHITECTURES ${TETMAG_SET_CUDA_ARCHS})
+endif()
 
-foreach(ARCH ${GPU_ARCHITECTURES})		
-  list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_${ARCH},code=sm_${ARCH} ")
-endforeach() 
+set(CMAKE_CUDA_ARCHITECTURES "${GPU_ARCHITECTURES}")
 
-  add_definitions(-DUSE_CUDA)
-  set (NVCC_FLAGS "-DUSE_CUDA ; -Xptxas -O3; -Xcompiler -O3; -ccbin ${CMAKE_CUDA_HOST_COMPILER}; ")
-  #string(APPEND NVCC_FLAGS "-Xcudafe --diag_suppress=esa_on_defaulted_function_ignored; -Wno-deprecated-gpu-targets; ")
-  string(APPEND NVCC_FLAGS " -Wno-deprecated-gpu-targets; ")
-  find_package(CUDAToolkit REQUIRED)
-  list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS})
-
-  list(APPEND CUDA_NVCC_FLAGS " -w;")
-  # message(STATUS "NVCC_FLAGS: " ${CUDA_NVCC_FLAGS})
-
-  set (CUDA_FILES
-    ${GPU}EffFieldGPU.cu  
-    ${GPU}LLGWrapper.cu
-    ${GPU}GpuPotential.cu  
-    ${GPU}GPUSolver.cu
-    ${GPU}SetDevice.cu
-    ${GPU}SpMatCUDA.cu
-   )
+set(CUDA_FILES
+  ${GPU}EffFieldGPU.cu
+  ${GPU}LLGWrapper.cu
+  ${GPU}GpuPotential.cu
+  ${GPU}GPUSolver.cu
+  ${GPU}SetDevice.cu
+  ${GPU}SpMatCUDA.cu
+)

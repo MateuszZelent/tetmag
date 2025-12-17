@@ -53,16 +53,60 @@
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver          */
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix                */
 #include <nvector/nvector_openmp.h>    /* serial N_Vector types, fcts., macros */
-
 #include "Timer.h"
 #include <memory>
-
-
-
-struct UserData;
-
-typedef std::vector<double> state_type;
 #include <EffFieldCalc.h>
+typedef std::vector<double> state_type;
+
+class TheLLG;
+
+class UserData{
+	public:
+  	TheLLG* llg;
+  	int nx;
+  	std::vector<double> ret;
+  	std::vector<double> mag; 
+};
+
+
+class CPU_Integrator {
+public:
+  CPU_Integrator(TheLLG* llg, int nx);
+  ~CPU_Integrator();
+
+  int integrateCVODE(state_type& mag_vec, double ode_start_t, double ode_end_t, double dt);
+
+private:
+  TheLLG* llg_;
+  int nx_;
+
+  N_Vector m_;
+  void* cvode_mem_;
+  SUNLinearSolver LS_;
+  std::shared_ptr<UserData> data_;
+  SUNContext sunctx_;
+};
+
+#ifdef USE_CUDA
+class GPU_Integrator {
+	public:
+	  GPU_Integrator(TheLLG* llg, int nx);
+	  ~GPU_Integrator();
+	  int integrateCVODE(state_type& mag_vec, double ode_start_t, double ode_end_t, double dt);
+
+private:
+  TheLLG* llg_;
+  int nx_;
+
+  N_Vector m_gpu_;
+  void* cvode_mem_;
+  SUNLinearSolver LS_;
+  std::shared_ptr<UserData> data_;
+  SUNContext sunctx_;
+};
+#endif
+
+
 
 class TheLLG : public std::enable_shared_from_this<TheLLG> {
 private:
@@ -98,6 +142,19 @@ private:
 	state_type noPrecession(const state_type&);
 	state_type sttDynamics(const state_type&);
 	void calcUtermSTT(MRef&);
+	typedef std::function<int(std::vector<double>&, double, double, double)> IntegratorFunction;
+	IntegratorFunction integrator_;   
+	std::unique_ptr<CPU_Integrator> cpu_integrator_;
+#ifdef USE_CUDA
+    std::unique_ptr<GPU_Integrator> gpu_integrator_;
+#endif
+
+    friend class CPU_Integrator;
+#ifdef USE_CUDA
+    friend class GPU_Integrator;
+#endif
+
+	CPU_Integrator* cvode_cpu_;
 #ifdef USE_CUDA
 	std::shared_ptr<EffFieldGPU> gpucalc;
 	typedef thrust::device_vector<double> dev_vec;
@@ -139,19 +196,14 @@ private:
 	void selectEffectiveFields();
 	void selectLLGTypeGPU(int);
 	static int rhs(realtype t, N_Vector u, N_Vector u_dot, void *user_data);
-//	std::shared_ptr<TheLLG> getptr();
-//	UserData* alloc_user_data(const int );
 	std::shared_ptr<UserData> alloc_user_data(const int );
 public:
-//	static TheLLG* llg_p; // unused, attempt to transfer 'this' to static member function in CVODE
 	TheLLG(SimulationData& , const MeshData&, int );
 	void operator()(const state_type&, state_type&, const double /*time*/);
 #ifdef USE_CUDA 
     void operator()(const dev_vec&, dev_vec&, const double /*time*/);
 #endif
-    int IntegrateOnGPU( std::vector<double>& , double , double , double );
-    int gpuODE( std::vector<double>& , double , double , double );
-    int IntegrateODEINT( std::vector<double>& , double , double , double );
+    void initIntegrator();
     int integrateSUNDIALS( std::vector<double>& , double , double , double );
 	double getDemagEnergy(MRef&);
 	double getDMIEnergy(MRef&);
@@ -171,13 +223,7 @@ public:
 	void outputTimer();
 	double getDirectExch(MRef&);
 	double getDirectDMI(MRef&);
-};
 
-
-struct UserData{
-  std::shared_ptr<TheLLG> llg;
-  int nx;
-  std::vector<double> ret;
 };
 
 

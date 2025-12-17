@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -110,16 +110,8 @@ bool timeReached(double tnow, double tschedule) {
 }
 
 void TheSimulation::start() {
-//	bool integrateOnGPU = prog.integrateOnGPU;
-	bool integrateOnGPU = false;
-	(void) integrateOnGPU;
 	if (sd.useGPU) {
-		integrateOnGPU = prog.integrateOnGPU;
-//		integrateOnGPU = true;
-#ifdef USE_CUDA 
-
-
-#else
+#ifndef USE_CUDA 
 		std::cout << "This version of tetmag does not support GPU acceleration." << std::endl;
 		exit(0);
 #endif
@@ -181,9 +173,9 @@ void TheSimulation::start() {
 	if (!prog.freezeDemag) {
 		LLG.setDemagData(demag);
 	}
-
+	LLG.initIntegrator();
 #ifdef USE_CUDA 
-	if (sd.useGPU && integrateOnGPU) { gpuWrap.init(sd.nx); }
+	if (sd.useGPU) {gpuWrap.init(sd.nx); }
 #endif
 	LLG.setMag(mag);
 	if (calcDemag) {
@@ -258,36 +250,8 @@ void TheSimulation::start() {
 //////
 			Map<MatrixXd_CM>(mag_vec.data(), nx, 3) = mag;
 			odeTimer.start();
-			// switching OFF ODEINT: Choice between CVODE and ODEINT is too complex, and ODEINT is incompatible with THRUST ///
-			prog.useCVODE = true;
-			if (prog.useCVODE) {
-#ifdef USE_CUDA
-				if (sd.useGPU && integrateOnGPU) {
-					total_its += LLG.gpuODE(mag_vec, ode_start_t, ode_end_t, dt);
-				} else {
-#endif
-					total_its += LLG.integrateSUNDIALS( mag_vec, ode_start_t, ode_end_t, dt );
-#ifdef USE_CUDA
-				}
-#endif
-			} else {
-///// REMOVING GPU INTEGRATION WITH ODEINT (INCOMPATIBILITY THRUST / BOOST) ////
-//
-//   To operate correctly with GPU, ODEINT needs to be patched; see: 
-//   https://github.com/boostorg/odeint/issues/45 
-//   https://github.com/boostorg/odeint/pull/46/files
-/*
-#ifdef USE_CUDA 
-				if (sd.useGPU && integrateOnGPU) {
-					total_its += LLG.IntegrateOnGPU(mag_vec, ode_start_t, ode_end_t, dt);
-				} else {
-#endif
-*/
-					total_its += LLG.IntegrateODEINT(mag_vec, ode_start_t, ode_end_t, dt);
-//#ifdef USE_CUDA 
-//				}
-//#endif
-			}
+			
+			total_its += LLG.integrateSUNDIALS( mag_vec, ode_start_t, ode_end_t, dt );
 			odeTimer.add();
 			mag = Map<MatrixXd_CM>(mag_vec.data(), nx, 3);
 			normalizeMag(mag);

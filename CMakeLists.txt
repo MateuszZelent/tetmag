@@ -20,22 +20,21 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.18)
 
-project(tetmag VERSION 1.7.9 LANGUAGES C CXX)
+project(tetmag VERSION 1.8.0 LANGUAGES C CXX)
 # These options can be set with ccmake or with cmake -D 
 option(TETMAG_USE_OPENMP "Compile with OpenMP" ON)
 option(TETMAG_USE_CUDA "Enable CUDA" ON)
 option(TETMAG_FIND_CUDA_ARCH "Autodetect available GPU architectures" ON)
-option(TETMAG_USE_CVODE_5 "Use CVODE v5 instead of latest release" OFF)
 set(TETMAG_SET_CUDA_ARCHS "61;75" CACHE STRING "manually set GPU architectures")
-set(TETMAG_HOST_COMPILER "/usr/bin/g++" CACHE FILEPATH "CUDA-compatible host compiler") 
+set(TETMAG_HOST_COMPILER "/usr/bin/g++" CACHE FILEPATH "CUDA-compatible host compiler")
 # ^^^ select host compiler version compatible with the installed CUDA version.
 # (see https://gist.github.com/ax3l/9489132 )
 
 # Installation prefix
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation prefix" FORCE)
+  set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation prefix" FORCE)
 endif()
 set(INSTALL_BIN_DIR "bin" CACHE PATH "")
 set(INSTALL_LIB_DIR "lib" CACHE PATH "")
@@ -47,32 +46,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckLanguage)
 check_language(CUDA)
-if (CMAKE_CUDA_COMPILER)
+if(CMAKE_CUDA_COMPILER)
   set(CMAKE_CUDA_STANDARD 17)
-  set(CMAKE_CUDA_HOST_COMPILER ${TETMAG_HOST_COMPILER} )  
+  set(CMAKE_CUDA_HOST_COMPILER ${TETMAG_HOST_COMPILER})
   enable_language(CUDA)
 endif(CMAKE_CUDA_COMPILER)
 
-if(TETMAG_USE_CUDA)  
-  find_package(CUDAToolkit QUIET)  
-  if (CUDAToolkit_FOUND)
+if(TETMAG_USE_CUDA)
+  find_package(CUDAToolkit QUIET)
+  if(CUDAToolkit_FOUND)
     set(USE_CUDA ON)
-    if (CMAKE_CUDA_COMPILER_VERSION LESS 10.1)    
+    if(CMAKE_CUDA_COMPILER_VERSION LESS 10.1)
       message(STATUS "A CUDA version of at least 10.1 is needed (found unsuitable version ${CMAKE_CUDA_COMPILER_VERSION})")
       message(WARNING "No suitable CUDA version found. Not using GPU.")
-      set(USE_CUDA OFF)     
+      set(USE_CUDA OFF)
     endif()
   else()
     message(WARNING "CUDA not found. Not using GPU.")
     set(USE_CUDA OFF)
   endif(CUDAToolkit_FOUND)
 else()
-  set(USE_CUDA OFF)  
+  set(USE_CUDA OFF)
 endif(TETMAG_USE_CUDA)
 
-if (TETMAG_USE_OPENMP)
-  include(FindOpenMP)  
-  if (NOT OpenMP_FOUND)
+if(TETMAG_USE_OPENMP)
+  include(FindOpenMP)
+  if(NOT OpenMP_FOUND)
     message(STATUS "OpenMP not found.")
   endif(NOT OpenMP_FOUND)
   set(USE_OpenMP ${OpenMP_FOUND})
@@ -82,10 +81,10 @@ endif(TETMAG_USE_OPENMP)
 
 message(STATUS "Build with options CUDA=${USE_CUDA} and OpenMP=${USE_OpenMP}")
 
-set(EXTDIR ${PROJECT_SOURCE_DIR}/external )
-set(LIBDIR ${PROJECT_SOURCE_DIR}/lib )
+set(EXTDIR ${PROJECT_SOURCE_DIR}/external)
+set(LIBDIR ${PROJECT_SOURCE_DIR}/lib)
 
-if (APPLE)
+if(APPLE)
   link_directories(/usr/local/lib)
   link_directories(${LIBDIR})
   include_directories(/usr/local/include)
@@ -101,34 +100,30 @@ message(STATUS "Build type set to '${CMAKE_BUILD_TYPE}'.")
 
 configure_file(${PROJECT_SOURCE_DIR}/main/tetmagVersion.h.in ${PROJECT_SOURCE_DIR}/main/tetmagVersion.h)
 
-if (TETMAG_USE_CVODE_5)
-  add_compile_definitions(USE_CVODE_5)
-endif() 
-
-if (CMAKE_BUILD_TYPE MATCHES Release)
+if(CMAKE_BUILD_TYPE MATCHES Release)
   #string(APPEND CMAKE_CXX_FLAGS_RELEASE " -mavx " ) # not compatible with CUDA
   #string(APPEND CMAKE_CXX_FLAGS_RELEASE " -march=native") # not compatible with CUDA
-  string(APPEND CMAKE_CXX_FLAGS_RELEASE " -fno-math-errno -Wno-unused -Wall -DNDEBUG" )
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE " -fno-math-errno -Wno-unused -Wall -DNDEBUG")
   message(STATUS "Build flags: ${CMAKE_CXX_FLAGS_RELEASE} ")
 endif()
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-	string(APPEND CMAKE_CXX_FLAGS_DEBUG " -ggdb3")
-	message(STATUS "Build flags: ${CMAKE_CXX_FLAGS_DEBUG} ")
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  string(APPEND CMAKE_CXX_FLAGS_DEBUG " -ggdb3")
+  message(STATUS "Build flags: ${CMAKE_CXX_FLAGS_DEBUG} ")
 endif()
 
 find_package(Eigen3 3.3.7 REQUIRED NO_MODULE)
 find_package(Boost CONFIG QUIET COMPONENTS filesystem program_options system thread)
 if(NOT Boost_FOUND)
-    find_package(Boost REQUIRED COMPONENTS filesystem program_options system thread)
-    if(Boost_FOUND AND Boost_VERSION_STRING VERSION_LESS "1.70")
-        if(POLICY CMP0167)
-            cmake_policy(SET CMP0167 NEW)
-        endif()
+  find_package(Boost REQUIRED COMPONENTS filesystem program_options system thread)
+  if(Boost_FOUND AND Boost_VERSION_STRING VERSION_LESS "1.70")
+    if(POLICY CMP0167)
+      cmake_policy(SET CMP0167 NEW)
     endif()
+  endif()
 endif()
 if(NOT Boost_FOUND)
-    message(FATAL_ERROR "Boost not found. Install the Boost library with components: filesystem, program_options, system, thread.")
+  message(FATAL_ERROR "Boost not found. Install the Boost library with components: filesystem, program_options, system, thread.")
 endif()
 find_package(Threads REQUIRED)
 find_package(VTK REQUIRED COMPONENTS CommonCore CommonDataModel IOXML IOLegacy)
@@ -144,37 +139,37 @@ set(SPECS ${PROJECT_SOURCE_DIR}/specs/)
 set(MAIN ${PROJECT_SOURCE_DIR}/main/)
 set(GPU ${PROJECT_SOURCE_DIR}/gpu/)
 
-if (USE_CUDA)   	
+if(USE_CUDA)
   include(${GPU}/CMakeLists.txt)
   add_library(cuda_cccl_includes INTERFACE)
   target_include_directories(cuda_cccl_includes INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
   foreach(root IN LISTS CUDAToolkit_INCLUDE_DIRS)
-    if (IS_DIRECTORY "${root}/cccl")
+    if(IS_DIRECTORY "${root}/cccl")
       target_include_directories(cuda_cccl_includes INTERFACE "${root}/cccl")
     endif()
   endforeach()
 endif(USE_CUDA)
 
-include(${EXTDIR}/CMakeLists.txt)   # install external dependencies
+include(${EXTDIR}/CMakeLists.txt) # install external dependencies
 
-include_directories(${PREPROC} ${UTILS} ${IO} ${SPECS} ${MAIN} ${GPU} ${EIGEN3_INCLUDE_DIR} )
+include_directories(${PREPROC} ${UTILS} ${IO} ${SPECS} ${MAIN} ${GPU} ${EIGEN3_INCLUDE_DIR})
 
-set (PREPROC_FILES
-  ${PREPROC}BEMprocessing.cpp  
+set(PREPROC_FILES
+  ${PREPROC}BEMprocessing.cpp
   ${PREPROC}BEProperties.cpp
   ${PREPROC}Boundary.cpp
   ${PREPROC}FEMprocessing.cpp
   ${PREPROC}Lindholm.cpp
-  ${PREPROC}LindholmCWrapper.cpp  
+  ${PREPROC}LindholmCWrapper.cpp
 )
 
 add_library(prep STATIC ${PREPROC_FILES})
 set(PREPLIB prep)
 target_link_libraries(${PREPLIB} VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
 
-set (TETMAG_FILES
-  ${MAIN}tetmag.cpp  
+set(TETMAG_FILES
+  ${MAIN}tetmag.cpp
   ${MAIN}AMGCLSolver.cpp
   ${UTILS}auxiliaries.cpp
   ${MAIN}DemagField.cpp
@@ -182,10 +177,10 @@ set (TETMAG_FILES
   ${IO}GMSHReader.cpp
   ${MAIN}h2interface.c
   ${SPECS}Hysteresis.cpp
-  ${SPECS}InitMag.cpp    
+  ${SPECS}InitMag.cpp
   ${IO}MaterialReader.cpp
   ${SPECS}Materials.cpp
-  ${SPECS}MeshData.cpp 
+  ${SPECS}MeshData.cpp
   ${IO}MeshReaderInterface.cpp
   ${IO}MeshWriter.cpp
   ${UTILS}PhysicalConstants.cpp
@@ -198,15 +193,27 @@ set (TETMAG_FILES
   ${UTILS}Timer.cpp
   ${IO}VTKReader.cpp
 )
- 
-if (USE_CUDA) 
-  set (CVODE_CUDA sundials_nveccuda)
-  cuda_add_executable(${PROJECT_NAME} ${TETMAG_FILES} ${CUDA_FILES})
+
+if(USE_CUDA)
+  set(CVODE_CUDA sundials_nveccuda)
+  add_executable(${PROJECT_NAME} ${TETMAG_FILES} ${CUDA_FILES})
   target_link_libraries(${PROJECT_NAME} PRIVATE cuda_cccl_includes)
   target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart CUDA::cusparse ${CVODE_CUDA})
+
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_CUDA)
+
+  target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xptxas=-O3>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-O3>
+    $<$<COMPILE_LANGUAGE:CUDA>:-Wno-deprecated-gpu-targets>
+    $<$<COMPILE_LANGUAGE:CUDA>:-w>
+  )
+  if(CMAKE_CUDA_HOST_COMPILER)
+    target_compile_options(${PROJECT_NAME} PRIVATE  $<$<COMPILE_LANGUAGE:CUDA>:-ccbin=${CMAKE_CUDA_HOST_COMPILER}>)
+  endif(CMAKE_CUDA_HOST_COMPILER)
 else()
   add_executable(${PROJECT_NAME} ${TETMAG_FILES})
-endif(USE_CUDA)	
+endif(USE_CUDA)
 
 add_dependencies(${PROJECT_NAME} amgcl sundials_cvode gmsh h2lib)
 target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
@@ -217,11 +224,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE VTK::CommonCore VTK::CommonDataMod
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${NCDF})
 
 if(USE_OpenMP)
- 	target_link_libraries( ${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
-  set (CVODE_OMP sundials_nvecopenmp)
-	add_dependencies(${PROJECT_NAME} ${CVODE_OMP})
-	target_link_libraries(${PROJECT_NAME} PRIVATE ${CVODE_OMP})
-endif(USE_OpenMP)	
+  target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
+  set(CVODE_OMP sundials_nvecopenmp)
+  add_dependencies(${PROJECT_NAME} ${CVODE_OMP})
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${CVODE_OMP})
+endif(USE_OpenMP)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -232,20 +239,20 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${amgcl_SOUR
 
 
 if(APPLE)
-   set_target_properties(${PROJECT_NAME} PROPERTIES
+  set_target_properties(${PROJECT_NAME} PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR};/usr/local/lib/"
     BUILD_WITH_INSTALL_RPATH TRUE
-   )
+  )
 else()
- set_target_properties(${PROJECT_NAME} PROPERTIES
+  set_target_properties(${PROJECT_NAME} PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}"
     BUILD_WITH_INSTALL_RPATH FALSE
- )
+  )
 endif()
 
 # Installation
 install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION ${INSTALL_BIN_DIR}
+  RUNTIME DESTINATION ${INSTALL_BIN_DIR}
 )
 
 # Manifest
@@ -256,23 +263,23 @@ install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libh2.a\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_cvode.a\\n\")")
 if(USE_CUDA)
-    install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nveccuda.a\\n\")")
+  install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nveccuda.a\\n\")")
 endif()
 if(USE_OpenMP)
-    install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nvecopenmp.a\\n\")")
+  install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_nvecopenmp.a\\n\")")
 endif()
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"\${HEADER_FILES}\")")
 
 # Uninstall
 if(NOT TARGET uninstall)
-    add_custom_target(uninstall
-        COMMAND ${CMAKE_COMMAND} -E echo "Uninstalling tetmag..."
-        COMMAND xargs rm -f < ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
-        COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
-        COMMAND find ${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR} -type d -empty -delete
-        COMMAND find ${CMAKE_INSTALL_PREFIX}/share/tetmag -type d -empty -delete
-        COMMAND ${CMAKE_COMMAND} -E echo "Uninstallation complete."
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Uninstalling tetmag files."
-    )
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -E echo "Uninstalling tetmag..."
+    COMMAND xargs rm -f < ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
+    COMMAND find ${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR} -type d -empty -delete
+    COMMAND find ${CMAKE_INSTALL_PREFIX}/share/tetmag -type d -empty -delete
+    COMMAND ${CMAKE_COMMAND} -E echo "Uninstallation complete."
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Uninstalling tetmag files."
+  )
 endif()

@@ -23,47 +23,47 @@
 ################################################################################
 # Install H2Lib
 
-if (USE_OpenMP)
-  set (H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
+if(USE_OpenMP)
+  set(H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
     ${EXTDIR}/h2config/options.inc.omp
     ${EXTDIR}/h2lib/options.inc.default
-    )
+  )
 else()
-  set (H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
+  set(H2CONFIG ${CMAKE_COMMAND} -E copy_if_different
     ${EXTDIR}/h2config/options.inc.serial
     ${EXTDIR}/h2lib/options.inc.default
-    )
+  )
 endif()
 
 
-if (APPLE)
-   if (USE_OpenMP)
-    set (H2_CONFIG_FILE ${EXTDIR}/h2config/system.inc.macos)
-   else()
-    set (H2_CONFIG_FILE ${EXTDIR}/h2lib/system.inc.macos)
-   endif()
+if(APPLE)
+  if(USE_OpenMP)
+    set(H2_CONFIG_FILE ${EXTDIR}/h2config/system.inc.macos)
+  else()
+    set(H2_CONFIG_FILE ${EXTDIR}/h2lib/system.inc.macos)
+  endif()
 
-   set(H2CONFIG ${H2CONFIG} && ${CMAKE_COMMAND} -E copy
-     ${H2_CONFIG_FILE}
-     ${EXTDIR}/h2lib/system.inc.linux
+  set(H2CONFIG ${H2CONFIG} && ${CMAKE_COMMAND} -E copy
+    ${H2_CONFIG_FILE}
+    ${EXTDIR}/h2lib/system.inc.linux
   )
 endif()
 
 include(ExternalProject)
 ExternalProject_Add(h2lib
-   GIT_REPOSITORY https://github.com/H2Lib/H2Lib.git
-   GIT_TAG collocation
-   UPDATE_DISCONNECTED true
-   SOURCE_DIR ${EXTDIR}/h2lib
-   CONFIGURE_COMMAND ${H2CONFIG}     
-   BUILD_IN_SOURCE true
-   INSTALL_COMMAND cmake -E echo "Skipping install step of h2Lib."
+  GIT_REPOSITORY https://github.com/H2Lib/H2Lib.git
+  GIT_TAG collocation
+  UPDATE_DISCONNECTED true
+  SOURCE_DIR ${EXTDIR}/h2lib
+  CONFIGURE_COMMAND ${H2CONFIG}
+  BUILD_IN_SOURCE true
+  INSTALL_COMMAND cmake -E echo "Skipping install step of h2Lib."
 )
 
 add_custom_command(
-    TARGET h2lib
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${EXTDIR}/h2lib/libh2.a  ${LIBDIR}/
+  TARGET h2lib
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy ${EXTDIR}/h2lib/libh2.a ${LIBDIR}/
 )
 
 add_library(h2 SHARED IMPORTED)
@@ -79,8 +79,8 @@ FetchContent_Declare(amgcl
   GIT_REPOSITORY https://github.com/ddemidov/amgcl.git
   GIT_TAG master
   GIT_SHALLOW true
-  GIT_PROGRESS true    
-  )
+  GIT_PROGRESS true
+)
 
 set(AMGCL_BUILD_EXAMPLES OFF CACHE BOOL "")
 set(AMGCL_BUILD_TESTS OFF CACHE BOOL "")
@@ -91,46 +91,36 @@ FetchContent_MakeAvailable(amgcl)
 # Install CVODE
 
 include(FetchContent)
+FetchContent_Declare(
+  cvode
+  GIT_REPOSITORY https://github.com/LLNL/sundials.git
+  GIT_TAG v6.7.0
+  GIT_SHALLOW true
+  GIT_PROGRESS true
+)
 
-if(TETMAG_USE_CVODE_5)   
-    FetchContent_Declare(
-        cvode
-        GIT_REPOSITORY https://github.com/LLNL/sundials.git
-        GIT_TAG v5.1.0
-        GIT_SHALLOW true
-        GIT_PROGRESS true
-    )
-else()
-    FetchContent_Declare(
-        cvode
-        GIT_REPOSITORY https://github.com/LLNL/sundials.git
-        GIT_TAG v6.7.0
-        GIT_SHALLOW true
-        GIT_PROGRESS true
-    )
-endif()
 
 set(SUNDIALS_ENABLE_LAPACK OFF CACHE BOOL "" FORCE)
 set(ENABLE_LAPACK OFF CACHE BOOL "" FORCE)
 set(ENABLE_SUNLINSOL_DENSE OFF CACHE BOOL "" FORCE)
-set(ENABLE_SUNLINSOL_BAND  OFF CACHE BOOL "" FORCE)
+set(ENABLE_SUNLINSOL_BAND OFF CACHE BOOL "" FORCE)
 set(ENABLE_SUNMATRIX_DENSE OFF CACHE BOOL "" FORCE)
-set(ENABLE_SUNMATRIX_BAND  OFF CACHE BOOL "" FORCE)
+set(ENABLE_SUNMATRIX_BAND OFF CACHE BOOL "" FORCE)
 
 
 set(BUILD_CVODE ON CACHE BOOL "" FORCE)
 
-if (USE_CUDA)
-    set(EXAMPLES_ENABLE_CUDA OFF CACHE BOOL "")
-    set(CMAKE_CUDA_ARCHITECTURES ${GPU_ARCHITECTURES})  
-    set(ENABLE_CUDA ON CACHE BOOL "")
-    set(BUILD_NVECTOR_CUDA ON CACHE BOOL "")
-    set(CMAKE_CUDA_STANDARD 14)
+if(USE_CUDA)
+  set(EXAMPLES_ENABLE_CUDA OFF CACHE BOOL "")
+  set(CMAKE_CUDA_ARCHITECTURES ${GPU_ARCHITECTURES})
+  set(ENABLE_CUDA ON CACHE BOOL "")
+  set(BUILD_NVECTOR_CUDA ON CACHE BOOL "")
+  set(CMAKE_CUDA_STANDARD 14)
 endif()
 
-if (USE_OpenMP)
-    set(ENABLE_OPENMP ON CACHE BOOL "")
-    set(BUILD_NVECTOR_OPENMP ON CACHE BOOL "")
+if(USE_OpenMP)
+  set(ENABLE_OPENMP ON CACHE BOOL "")
+  set(BUILD_NVECTOR_OPENMP ON CACHE BOOL "")
 endif()
 
 set(BUILD_ARKODE OFF CACHE BOOL "")
@@ -147,24 +137,24 @@ add_compile_options(-Wno-reorder)
 set(CVODELIB sundials_cvode)
 
 install(FILES ${LIBDIR}/libsundials_cvode.a
-    DESTINATION ${INSTALL_LIB_SUBDIR}
+  DESTINATION ${INSTALL_LIB_SUBDIR}
 )
 if(USE_CUDA)
-    install(FILES ${LIBDIR}/libsundials_nveccuda.a
-        DESTINATION ${INSTALL_LIB_SUBDIR}
-    )
+  install(FILES ${LIBDIR}/libsundials_nveccuda.a
+    DESTINATION ${INSTALL_LIB_SUBDIR}
+  )
 endif()
 if(USE_OpenMP)
-    install(FILES ${LIBDIR}/libsundials_nvecopenmp.a
-        DESTINATION ${INSTALL_LIB_SUBDIR}
-    )
+  install(FILES ${LIBDIR}/libsundials_nvecopenmp.a
+    DESTINATION ${INSTALL_LIB_SUBDIR}
+  )
 endif()
 
 ###############################################################################
 # Intall GMSH
 
 if(WIN32)
-  if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/Windows/gmsh-git-Windows64-sdk.zip")
   else()
     message(FATAL_ERROR "### ERROR: The 32-bit version of Windows is not supported.")
@@ -173,16 +163,16 @@ endif(WIN32)
 
 if(APPLE)
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-   set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSARM-sdk.tgz")
+    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSARM-sdk.tgz")
   else()
-   set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSX-sdk.tgz")
+    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSX-sdk.tgz")
   endif()
 elseif(UNIX)
   set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/Linux/gmsh-git-Linux64-sdk.tgz")
 endif()
 
 if(POLICY CMP0135)
-    cmake_policy(SET CMP0135 NEW)
+  cmake_policy(SET CMP0135 NEW)
 endif()
 
 include(ExternalProject)
@@ -193,19 +183,19 @@ ExternalProject_Add(gmsh
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
-  )
+)
 
 add_custom_command(
-    TARGET gmsh
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${EXTDIR}/gmsh/lib/libgmsh*  ${LIBDIR}/
+  TARGET gmsh
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy ${EXTDIR}/gmsh/lib/libgmsh* ${LIBDIR}/
 )
 
 add_library(gmsh_lib SHARED IMPORTED)
-if (APPLE)
-   set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.dylib)
-elseif (UNIX)
-   set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.so)
+if(APPLE)
+  set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.dylib)
+elseif(UNIX)
+  set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.so)
 endif()
 set(GMSHLIB gmsh_lib)
 

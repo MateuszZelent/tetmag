@@ -1,5 +1,5 @@
 #    tetmag - A general-purpose finite-element micromagnetic simulation software package
-#    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
+#    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 #
 #    Author: Riccardo Hertel
 #
@@ -151,61 +151,16 @@ if(USE_OpenMP)
 endif()
 
 ###############################################################################
-# Intall GMSH
+# Install MshIO
 
-if(WIN32)
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/Windows/gmsh-git-Windows64-sdk.zip")
-  else()
-    message(FATAL_ERROR "### ERROR: The 32-bit version of Windows is not supported.")
-  endif()
-endif(WIN32)
-
-if(APPLE)
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSARM-sdk.tgz")
-  else()
-    set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/macOS/gmsh-git-MacOSX-sdk.tgz")
-  endif()
-elseif(UNIX)
-  set(GMSH_DOWNLOAD_LINK "https://gmsh.info/bin/Linux/gmsh-git-Linux64-sdk.tgz")
-endif()
-
-if(POLICY CMP0135)
-  cmake_policy(SET CMP0135 NEW)
-endif()
-
-include(ExternalProject)
-ExternalProject_Add(gmsh
-  URL ${GMSH_DOWNLOAD_LINK}
-  UPDATE_DISCONNECTED true
-  SOURCE_DIR ${EXTDIR}/gmsh
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND ""
-  INSTALL_COMMAND ""
+FetchContent_Declare(mshio
+  GIT_REPOSITORY https://github.com/qnzhou/MshIO.git
+  GIT_TAG main
+  GIT_SHALLOW true
+  GIT_PROGRESS true
 )
 
-add_custom_command(
-  TARGET gmsh
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy ${EXTDIR}/gmsh/lib/libgmsh* ${LIBDIR}/
-)
-
-add_library(gmsh_lib SHARED IMPORTED)
-if(APPLE)
-  set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.dylib)
-elseif(UNIX)
-  set_target_properties(gmsh_lib PROPERTIES IMPORTED_LOCATION ${LIBDIR}/libgmsh.so)
-endif()
-set(GMSHLIB gmsh_lib)
-
-if(APPLE)
-  file(GLOB GMSH_LIB_VERSION "${LIBDIR}/libgmsh.*.dylib")
-  install(FILES ${GMSH_LIB_VERSION} DESTINATION ${INSTALL_LIB_SUBDIR})
-else()
-  file(GLOB GMSH_LIB_VERSION "${LIBDIR}/libgmsh.so.*")
-  install(FILES ${GMSH_LIB_VERSION} DESTINATION ${INSTALL_LIB_SUBDIR})
-endif()
+FetchContent_MakeAvailable(mshio)
 
 ################################################################################
 

@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -12,67 +12,74 @@
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details. 
- 
-    Contact: Riccardo Hertel, IPCMS Strasbourg, 23 rue du Loess, 
+    GNU Affero General Public License for more details.
+
+    Contact: Riccardo Hertel, IPCMS Strasbourg, 23 rue du Loess,
     	     67034 Strasbourg, France.
 	     riccardo.hertel@ipcms.unistra.fr
-	     
+
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-    
+
 /*
  * GMSHReader.cpp
  *
  *  Created on: Feb 1, 2019
- *      Author: Riccardo Hertel 
+ *      Author: Riccardo Hertel
  *
  */
 #include <Eigen/Dense>
 #include <string>
-#include <gmsh.h>
+#include <mshio/mshio.h>
 #include <vector>
 #include <map>
 #include <iostream>
 #include "GMSHReader.h"
-#include <numeric> // for std::accumulate
+#include <numeric>
 using namespace Eigen;
-  
+using RowMatrixXd = Matrix<double, Dynamic, Dynamic, RowMajor>;
+using RowMatrixXi = Matrix<int, Dynamic, Dynamic, RowMajor>;
+
 GMSHReader::GMSHReader(std::string name) : filename(name + ".msh") {
-  gmsh::initialize();
-  gmsh::open(filename);  
-}
+  mshio::MshSpec spec = mshio::load_msh(filename);
 
-
-void GMSHReader::readPoints() {
   std::vector<double> coords;
-  std::vector<double> parametricCoord; // not used here. Only required to match the argument list of getNodes()
-  int dim = -1; // negative value: get ALL nodes, not only those belonging to elements of specific dim
-  int tag = -1; // negative value: get get all nodes, irrespective of tag
-  const bool includeBoundary = true;	   
-  gmsh::model::mesh::getNodes( nodeTags, coords, parametricCoord, dim, tag, includeBoundary ); 
-  nx =  nodeTags.size();
-  xyz.resize(nx,3);
-  xyz = Map<Matrix<double, Dynamic, Dynamic, RowMajor> >(coords.data(), nx, 3);
-  nodeTags = getNodeTags();
+  for (const mshio::NodeBlock& block : spec.nodes.entity_blocks) {
+    for (size_t i = 0; i < block.num_nodes_in_block; ++i) {
+      nodeTags.push_back(block.tags[i]);
+      coords.push_back(block.data[3 * i]);
+      coords.push_back(block.data[3 * i + 1]);
+      coords.push_back(block.data[3 * i + 2]);
+    }
+  }
+  nx = nodeTags.size();
+  xyz.resize(nx, 3);
+  xyz = Map<RowMatrixXd>(coords.data(), nx, 3);
+
+  const int tetElementType = 4;
+  const int nodesPerTet = 4;
+  std::vector<int> connectivity;
+  nel = 0;
+  for (const mshio::ElementBlock& block : spec.elements.entity_blocks) {
+    if (block.element_type != tetElementType) continue;
+    size_t stride = nodesPerTet + 1;
+    for (size_t i = 0; i < block.num_elements_in_block; ++i) {
+      for (int j = 1; j <= nodesPerTet; ++j) {
+        connectivity.push_back(static_cast<int>(block.data[i * stride + j]));
+      }
+      ++nel;
+    }
+  }
+  fel.resize(nel, 4);
+  fel = Map<RowMatrixXi>(connectivity.data(), nel, 4);
 }
 
 
-void GMSHReader::readCells() {
-  int dim = 3; // get only three-dimensional elements (tetrahedrons)
-  int tag = -1; // negative: get get all nodes, irrespective of tag
-  std::vector<int> elementTypes; // unnecessary if mesh contains only one type of elements. Needed as argument of getElements()
-  std::vector<std::vector<size_t> >  connectivities;
-  std::vector<std::vector<size_t> >  elementTags;
-  gmsh::model::mesh::getElements( elementTypes, elementTags, connectivities, dim, tag );
-  nel =  elementTags[0].size();
-  fel.resize(nel,4);
-  std::vector<int> myc(nel *  4);
-  for (size_t i = 0; i < nel*4; ++i)
-      myc[i] = static_cast<int>(connectivities[0][i]); // Map currently does not work with size_t type
-  fel = Map<Matrix<int, Dynamic, Dynamic, RowMajor> >(myc.data(), nel, 4);
-}
+void GMSHReader::readPoints() {}
+
+
+void GMSHReader::readCells() {}
 
 
 bool GMSHReader::renumberNodes(){
@@ -94,7 +101,7 @@ bool GMSHReader::renumberNodes(){
 
 
 void GMSHReader::clean() {
-  renumberNodes(); 
+  renumberNodes();
   if ( hasOrphanNodes() ) {
     deleteOrphanNodes();
     renumberNodes();
@@ -122,7 +129,7 @@ void GMSHReader::deleteOrphanNodes() {
   nodeTags.resize(nx - totalOrphans);
   for (size_t i = 0; i < nx; ++i) {
     if (!isOrphan[i]) {
-      xyz_new.row(reindex) = xyz.row(i);     
+      xyz_new.row(reindex) = xyz.row(i);
       nodeTags[reindex] = i;
       ++reindex;
     }
@@ -131,12 +138,12 @@ void GMSHReader::deleteOrphanNodes() {
 };
 
 
-Eigen::MatrixXi GMSHReader::getElements() {
+MatrixXi GMSHReader::getElements() {
   return fel;
 }
 
 
-Eigen::MatrixXd GMSHReader::getNodes() {
+MatrixXd GMSHReader::getNodes() {
   return xyz;
 }
 
@@ -144,4 +151,3 @@ Eigen::MatrixXd GMSHReader::getNodes() {
 std::vector<size_t> GMSHReader::getNodeTags() {
   return nodeTags;
 }
-

@@ -72,7 +72,7 @@ The tetmag software is powered by these awesome projects:
 - [SUNDIALS / CVODE](https://github.com/LLNL/sundials) - Solution of ordinary differential equation systems
 - [Eigen](http://eigen.tuxfamily.org/) - Linear algebra
 - [H2Lib](https://github.com/H2Lib) - Hierarchical matrix data compression
-- [VTK](https://github.com/Kitware/VTK) and [gmsh](https://gitlab.onelab.info/gmsh/gmsh) - I/O of finite-element mesh data
+- [VTK](https://github.com/Kitware/VTK) and [MshIO](https://github.com/qnzhou/MshIO) - I/O of finite-element mesh data
 
 - [CUDA / Thrust](https://developer.nvidia.com/cuda-downloads) - GPU acceleration
 - [boost](https://github.com/boostorg) - Powerful C++ libraries 

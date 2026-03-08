@@ -37,6 +37,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
 
 #ifdef _OPENMP
 #include <omp.h>

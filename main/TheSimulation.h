@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -47,8 +47,6 @@
 
 #ifdef USE_CUDA
 	#include "EffFieldGPU.h"
-//	#include <paralution/paralution.hpp>
-	#include "LLGWrapper.h"
 #endif
 
 class TheSimulation {
@@ -84,7 +82,6 @@ private:
 	void showTimer();
 #ifdef USE_CUDA
 	std::shared_ptr<EffFieldGPU> onGPU;
-	LLGWrapper gpuWrap;
 #endif
 
 public:

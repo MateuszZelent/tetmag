@@ -1,5 +1,5 @@
 #    tetmag - A general-purpose finite-element micromagnetic simulation software package
-#    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
+#    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 #
 #    Author: Riccardo Hertel
 #
@@ -46,7 +46,7 @@ set(CMAKE_CUDA_ARCHITECTURES "${GPU_ARCHITECTURES}")
 
 set(CUDA_FILES
   ${GPU}EffFieldGPU.cu
-  ${GPU}LLGWrapper.cu
+  ${GPU}TheLLG_GPU.cu
   ${GPU}GpuPotential.cu
   ${GPU}GPUSolver.cu
   ${GPU}SetDevice.cu

@@ -1,5 +1,5 @@
 #    tetmag - A general-purpose finite-element micromagnetic simulation software package
-#    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
+#    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 #
 #    Author: Riccardo Hertel
 #
@@ -22,7 +22,7 @@
 #
 cmake_minimum_required(VERSION 3.18)
 
-project(tetmag VERSION 1.8.1 LANGUAGES C CXX)
+project(tetmag VERSION 1.8.2 LANGUAGES C CXX)
 # These options can be set with ccmake or with cmake -D 
 option(TETMAG_USE_OPENMP "Compile with OpenMP" ON)
 option(TETMAG_USE_CUDA "Enable CUDA" ON)
@@ -187,6 +187,7 @@ set(TETMAG_FILES
   ${SPECS}ProgramSpecs.cpp
   ${UTILS}ProcessInformation.cpp
   ${SPECS}SimulationData.cpp
+  ${MAIN}LLGIntegrator.cpp
   ${MAIN}SolverFactory.cpp
   ${MAIN}TheLLG.cpp
   ${MAIN}TheSimulation.cpp

@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -12,16 +12,16 @@
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details. 
- 
-    Contact: Riccardo Hertel, IPCMS Strasbourg, 23 rue du Loess, 
-    	     67034 Strasbourg, France.
-	     riccardo.hertel@ipcms.unistra.fr
-	     
+    GNU Affero General Public License for more details.
+
+    Contact: Riccardo Hertel, IPCMS Strasbourg, 23 rue du Loess,
+             67034 Strasbourg, France.
+         riccardo.hertel@ipcms.unistra.fr
+
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-    
+
 /*
  * TheLLG.h
  *
@@ -29,202 +29,166 @@
  *      Author: riccardo
  */
 
-#ifndef THELLG_H_ 
-#define THELLG_H_ 
+#ifndef THELLG_H_
+#define THELLG_H_
+
 #include <Eigen/SparseCore>
 #include <Eigen/Dense>
 #include <vector>
-#include <functional> // for std::function, ref, reference_wrapper
+#include <functional>
+#include <memory>
+
 #include "SimulationData.h"
 #include "MeshData.h"
 #include "typedefs.h"
-#ifdef USE_CUDA 
-	#include <memory>
-	#include "EffFieldGPU.h"
-#endif
 #include "DemagField.h"
-
-#include <sunlinsol/sunlinsol_spgmr.h>  //access to SPGMR SUNLinearSolver
-#include <cvode/cvode_spils.h> // access to CVSpils interface
-#include <cvode/cvode.h> // prototypes for CVODE fcts., consts.
-#include <nvector/nvector_serial.h>  // access to serial N_Vector
-#include <sundials/sundials_version.h>  // defs. of realtype, sunindextype
-#include <sundials/sundials_types.h>
-#include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver          */
-#include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix                */
-#include <nvector/nvector_openmp.h>    /* serial N_Vector types, fcts., macros */
+#include "EffFieldCalc.h"
 #include "Timer.h"
-#include <memory>
-#include <EffFieldCalc.h>
-typedef std::vector<double> state_type;
-
-class TheLLG;
-
-class UserData{
-	public:
-  	TheLLG* llg;
-  	int nx;
-  	std::vector<double> ret;
-  	std::vector<double> mag; 
-};
-
-
-class CPU_Integrator {
-public:
-  CPU_Integrator(TheLLG* llg, int nx);
-  ~CPU_Integrator();
-
-  int integrateCVODE(state_type& mag_vec, double ode_start_t, double ode_end_t, double dt);
-
-private:
-  TheLLG* llg_;
-  int nx_;
-
-  N_Vector m_;
-  void* cvode_mem_;
-  SUNLinearSolver LS_;
-  std::shared_ptr<UserData> data_;
-  SUNContext sunctx_;
-};
 
 #ifdef USE_CUDA
-class GPU_Integrator {
-	public:
-	  GPU_Integrator(TheLLG* llg, int nx);
-	  ~GPU_Integrator();
-	  int integrateCVODE(state_type& mag_vec, double ode_start_t, double ode_end_t, double dt);
-
-private:
-  TheLLG* llg_;
-  int nx_;
-
-  N_Vector m_gpu_;
-  void* cvode_mem_;
-  SUNLinearSolver LS_;
-  std::shared_ptr<UserData> data_;
-  SUNContext sunctx_;
-};
+#include "EffFieldGPU.h"
 #endif
 
+class CPU_Integrator;
+#ifdef USE_CUDA
+class GPU_Integrator;
+#endif
+
+typedef std::vector<double> state_type;
 
 
 class TheLLG : public std::enable_shared_from_this<TheLLG> {
+public:
+    TheLLG(SimulationData&, const MeshData&, int);
+    ~TheLLG();
+
+    void operator()(const state_type&, state_type&, const double /*time*/);
+#ifdef USE_CUDA
+    typedef thrust::device_vector<double> dev_vec;
+    void operator()(const dev_vec&, dev_vec&, const double /*time*/);
+#endif
+
+    void initIntegrator();
+    int  integrateSUNDIALS(std::vector<double>&, double, double, double);
+
+    double getDemagEnergy(MRef&);
+    double getDMIEnergy(MRef&);
+    double getSurfaceAnisotropyEnergy(MRef&);
+    double getCubicAnisotropyEnergy(MRef&);
+    double getUniaxialAnisotropyEnergy(MRef&);
+    double getExchangeEnergy(MRef&);
+    double getZeemanEnergy(MRef&);
+    double getDirectExch(MRef&);
+    double getDirectDMI(MRef&);
+    double getMaxTorque(MRef&);
+
+    void setDemagData(const DemagField&);
+    void setSTTData(const STT&);
+    void setZeemanField(int, double, double, double, double, double, double);
+    void setHdem(MRef&);
+    void setTime(double);
+    void setMag(MRef&);
+#ifdef USE_CUDA
+    void updateDeviceMag(const thrust::device_vector<double>& mag_d);
+#endif
+
+    Eigen::Vector3d getMeanH();
+    void outputTimer();
+
 private:
-	Timer copyTimer, heffTimer;
-	int nx;
-	double next_refresh;
-	double refresh_time;
-	Eigen::VectorXd NodeVolume;
-	double alpha;
-	double Habs;
-	Eigen::MatrixXd Hexc;
-	Eigen::MatrixXd Hdem;
-	Eigen::MatrixXd Hku;
-	Eigen::MatrixXd Hext;
-	Eigen::MatrixXd Hcub;
-	Eigen::MatrixXd Hsurf;
-	Eigen::MatrixXd Heff;
-	Eigen::MatrixXd Hdmi;
-	Eigen::MatrixXd Hpls;
-	Eigen::MatrixXd Hswp;
-	Eigen::MatrixXd Hloc;
-	double theta_H, phi_H;
-	Eigen::VectorXd Js;
-	Eigen::VectorXd JsVol;
-	Eigen::VectorXd invNodeVol;
-	Eigen::VectorXd invJs;
-	Eigen::MatrixXd ret;
-	std::vector<double> ret_vec;
-	Hdynamic hp;
-	Hlocal hl;
-	std::shared_ptr<EffFieldCalc> efc;
-	state_type classicVersion(const state_type&);
-	state_type noPrecession(const state_type&);
-	state_type sttDynamics(const state_type&);
-	void calcUtermSTT(MRef&);
-	typedef std::function<int(std::vector<double>&, double, double, double)> IntegratorFunction;
-	IntegratorFunction integrator_;   
-	std::unique_ptr<CPU_Integrator> cpu_integrator_;
+    Timer copyTimer, heffTimer;
+
+    int                 nx;
+    Eigen::VectorXd     NodeVolume;
+    double              alpha;
+    Eigen::VectorXd     Js;
+    Eigen::VectorXd     JsVol;
+    Eigen::VectorXd     invNodeVol;
+    Eigen::VectorXd     invJs;
+    double              totalVolume;
+    double              realTimeScale;
+    double              timeInPs;
+
+    Eigen::MatrixXd Hexc;
+    Eigen::MatrixXd Hdem;
+    Eigen::MatrixXd Hku;
+    Eigen::MatrixXd Hext;
+    Eigen::MatrixXd Hcub;
+    Eigen::MatrixXd Hsurf;
+    Eigen::MatrixXd Heff;
+    Eigen::MatrixXd Hdmi;
+    Eigen::MatrixXd Hpls;
+    Eigen::MatrixXd Hswp;
+    Eigen::MatrixXd Hloc;
+
+    Hdynamic hp;
+    Hlocal   hl;
+
+    std::shared_ptr<EffFieldCalc>  efc;
+    std::shared_ptr<DemagField>    demag;
+    bool                           freezeDemag;
+    double                         next_refresh;
+    double                         refresh_time;
+
+    bool useUniaxial;
+    bool useCubic;
+    bool useSurfaceAnisotropy;
+    bool useDMI;
+    bool useSTT;
+    bool useGPU;
+
+    STT stt;
+
+    Eigen::MatrixXd     ret;
+    std::vector<double> ret_vec;
+
+    state_type classicVersion(const state_type&);
+    state_type noPrecession(const state_type&);
+    state_type sttDynamics(const state_type&);
+    void       calcUtermSTT(MRef&);
+
+    std::function<state_type(const state_type&)> selectedLLGType;
+
+    void selectLLGType(int);
+
+    std::vector<std::function<void(MRef&)>> calcEffectiveField;
+
+    void selectEffectiveFields();
+    void evaluateAllEffectiveFields(MRef&);
+    Eigen::MatrixXd totalEffectiveField();
+
+    void calcExchangeField(MRef&);
+    void calcDemagField(MRef&);
+    void calcUniaxialAnisotropyField(MRef&);
+    void calcCubicAnisotropyField(MRef&);
+    void calcSurfaceAnisotropyField(MRef&);
+    void calcDMIField(MRef&);
+    void calcPulseField(MRef&);
+    void calcSweepField(MRef&);
+    void calcLocalField(MRef&);
+
+    void setHdynField();
+
+    typedef std::function<int(std::vector<double>&, double, double, double)> IntegratorFunction;
+    IntegratorFunction integrator_;
+
+    std::unique_ptr<CPU_Integrator> cpu_integrator_;
 #ifdef USE_CUDA
     std::unique_ptr<GPU_Integrator> gpu_integrator_;
 #endif
 
-    friend class CPU_Integrator;
 #ifdef USE_CUDA
-    friend class GPU_Integrator;
-#endif
+    std::shared_ptr<EffFieldGPU>    gpucalc;
 
-	CPU_Integrator* cvode_cpu_;
-#ifdef USE_CUDA
-	std::shared_ptr<EffFieldGPU> gpucalc;
-	typedef thrust::device_vector<double> dev_vec;
-	dev_vec classicVersion_GPU(const dev_vec &);
-	dev_vec noPrecession_GPU(const dev_vec &);
-	dev_vec sttDynamics_GPU(const dev_vec &);
-	std::function <dev_vec(const dev_vec&)> selectedLLGType_GPU;
-	Eigen::MatrixXd effFieldsForGPU(const dev_vec&);
-	static int rhs_d(realtype t, N_Vector u, N_Vector u_dot, void *user_data);
-#endif
-	std::function <state_type(const state_type&)> selectedLLGType;
-	std::vector <std::function <void(MRef&)> > calcEffectiveField;
-	void selectLLGType(int);
-	void calcExchangeField(MRef&);
-	bool useUniaxial;
-	void calcUniaxialAnisotropyField(MRef&);
-	bool useCubic;
-	void calcCubicAnisotropyField(MRef&);
-	bool useSurfaceAnisotropy;
-	void calcSurfaceAnisotropyField(MRef&);
-	bool useDMI;
-	bool useGPU;
-	bool noDemag;
-	void calcDMIField(MRef&);
-	void calcPulseField(MRef&);
-	void calcSweepField(MRef&);
-	void calcLocalField(MRef&);
-	double totalVolume;
-	STT stt; // struct defined in ProgramSpecs.h
-	std::shared_ptr<DemagField> demag;
-	bool freezeDemag;
-	void calcDemagField(MRef&);
-	void evaluateAllEffectiveFields(MRef&);
-	Eigen::MatrixXd totalEffectiveField();
-	double realTimeScale;
-	double timeInPs;
-	void setHdynField();
-	bool useSTT;
-	void selectEffectiveFields();
-	void selectLLGTypeGPU(int);
-	static int rhs(realtype t, N_Vector u, N_Vector u_dot, void *user_data);
-	std::shared_ptr<UserData> alloc_user_data(const int );
-public:
-	TheLLG(SimulationData& , const MeshData&, int );
-	void operator()(const state_type&, state_type&, const double /*time*/);
-#ifdef USE_CUDA 
-    void operator()(const dev_vec&, dev_vec&, const double /*time*/);
-#endif
-    void initIntegrator();
-    int integrateSUNDIALS( std::vector<double>& , double , double , double );
-	double getDemagEnergy(MRef&);
-	double getDMIEnergy(MRef&);
-	double getSurfaceAnisotropyEnergy(MRef&);
-	double getCubicAnisotropyEnergy(MRef&);
-	double getUniaxialAnisotropyEnergy(MRef&);
-	double getExchangeEnergy(MRef&);
-	double getZeemanEnergy(MRef&);
-	double getMaxTorque(MRef&);
-	void setDemagData( const DemagField& );
-	void setSTTData( const STT& );
-	void setZeemanField(int, double, double, double, double, double, double);
-	void setHdem(MRef&);
-	void setTime(double);
-	void setMag(MRef&);
-	Eigen::Vector3d getMeanH();
-	void outputTimer();
-	double getDirectExch(MRef&);
-	double getDirectDMI(MRef&);
+    dev_vec classicVersion_GPU(const dev_vec&);
+    dev_vec noPrecession_GPU(const dev_vec&);
+    dev_vec sttDynamics_GPU(const dev_vec&);
 
+    std::function<dev_vec(const dev_vec&)> selectedLLGType_GPU;
+
+    Eigen::MatrixXd effFieldsForGPU(const dev_vec&);
+    void selectLLGTypeGPU(int);
+#endif
 };
-
 
 #endif /* THELLG_H_ */

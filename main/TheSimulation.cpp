@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -174,9 +174,6 @@ void TheSimulation::start() {
 		LLG.setDemagData(demag);
 	}
 	LLG.initIntegrator();
-#ifdef USE_CUDA 
-	if (sd.useGPU) {gpuWrap.init(sd.nx); }
-#endif
 	LLG.setMag(mag);
 	if (calcDemag) {
 		LLG.setHdem(demag.calcField(mag));

@@ -204,7 +204,6 @@ void TheSimulation::start() {
 	logstream << std::setprecision(12);
 
 	int fileNumber = prog.firstFileNumber;
-	size_t total_its = 0;
 	normalizeMag(mag);
 	double maximumTorque = LLG.getMaxTorque(mag);
 
@@ -248,7 +247,7 @@ void TheSimulation::start() {
 			Map<MatrixXd_CM>(mag_vec.data(), nx, 3) = mag;
 			odeTimer.start();
 			
-			total_its += LLG.integrateSUNDIALS( mag_vec, ode_start_t, ode_end_t, dt );
+			LLG.integrateSUNDIALS( mag_vec, ode_start_t, ode_end_t, dt );
 			odeTimer.add();
 			mag = Map<MatrixXd_CM>(mag_vec.data(), nx, 3);
 			normalizeMag(mag);

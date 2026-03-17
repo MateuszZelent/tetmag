@@ -126,6 +126,11 @@ TheLLG::TheLLG(SimulationData& sd, const MeshData& msh, int LLGVersion)
     invJs = Js.cwiseInverse().unaryExpr([](double v) {
         return std::isfinite(v) ? v : 0.0;
     });
+#ifdef USE_CUDA
+    if (useGPU) {
+        gpucalc->setInvJs(invJs);
+    }
+#endif
     JsVol = Js.cwiseProduct(NodeVolume);
 
     if (hp.pulseIsUsed || hp.sweepIsUsed)
@@ -186,42 +191,20 @@ void TheLLG::selectLLGType(int choice)
 
 state_type TheLLG::classicVersion(const state_type& mag_vec)
 {
-    if (useGPU) {
-#ifdef USE_CUDA
-        gpucalc->setMagDev(mag_vec);
-#endif
-    }
     Map<const MatrixXd_CM> Mag(mag_vec.data(), nx, 3);
     evaluateAllEffectiveFields(Mag);
     Heff = totalEffectiveField();
-    if (useGPU) {
-#ifdef USE_CUDA
-        ret_vec = gpucalc->ClassicLLG_hst(Heff, alpha);
-#endif
-    } else {
-        const MatrixXd MxH = cross(Mag, Heff);
-        Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = -MxH - alpha * cross(Mag, MxH);
-    }
+    const MatrixXd MxH = cross(Mag, Heff);
+    Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = -MxH - alpha * cross(Mag, MxH);
     return ret_vec;
 }
 
 state_type TheLLG::noPrecession(const state_type& mag_vec)
 {
-    if (useGPU) {
-#ifdef USE_CUDA
-        gpucalc->setMagDev(mag_vec);
-#endif
-    }
     Map<const MatrixXd_CM> Mag(mag_vec.data(), nx, 3);
     evaluateAllEffectiveFields(Mag);
     Heff = totalEffectiveField();
-    if (useGPU) {
-#ifdef USE_CUDA
-        ret_vec = gpucalc->LLG_noPrec_hst(Heff, alpha);
-#endif
-    } else {
-        Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = -alpha * cross(Mag, cross(Mag, Heff));
-    }
+    Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = -alpha * cross(Mag, cross(Mag, Heff));
     return ret_vec;
 }
 
@@ -230,15 +213,9 @@ state_type TheLLG::sttDynamics(const state_type& mag_vec)
     const std::vector<double> LLGpart = classicVersion(mag_vec);
     Map<const MatrixXd_CM> Mag(mag_vec.data(), nx, 3);
     calcUtermSTT(Mag);
-    if (useGPU) {
-#ifdef USE_CUDA
-        ret_vec = gpucalc->STT_term_LLG_hst(stt.Ustt, alpha, stt.beta);
-#endif
-    } else {
-        const MatrixXd MxU = cross(Mag, stt.Ustt);
-        ret = -(stt.beta - alpha) * MxU - (1. + alpha * stt.beta) * cross(Mag, MxU);
-        Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = ret;
-    }
+    const MatrixXd MxU = cross(Mag, stt.Ustt);
+    ret = -(stt.beta - alpha) * MxU - (1. + alpha * stt.beta) * cross(Mag, MxU);
+    Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = ret;
     if (stt.pulseIsUsed) {
         double pulseVal = stt.gaussPulseValue(timeInPs);
         std::transform(ret_vec.begin(), ret_vec.end(), ret_vec.begin(),
@@ -251,16 +228,10 @@ state_type TheLLG::sttDynamics(const state_type& mag_vec)
 
 void TheLLG::calcUtermSTT(MRef& Mag)
 {
-    if (useGPU) {
-#ifdef USE_CUDA
-        stt.Ustt = gpucalc->UTermSTT_GPU();
-#endif
-    } else {
-        for (int i = 0; i < 3; ++i) {
-            stt.Ustt.col(i) = stt.eta_jx.cwiseProduct(stt.gradX * Mag.col(i))
-                            + stt.eta_jy.cwiseProduct(stt.gradY * Mag.col(i))
-                            + stt.eta_jz.cwiseProduct(stt.gradZ * Mag.col(i));
-        }
+    for (int i = 0; i < 3; ++i) {
+        stt.Ustt.col(i) = stt.eta_jx.cwiseProduct(stt.gradX * Mag.col(i))
+                        + stt.eta_jy.cwiseProduct(stt.gradY * Mag.col(i))
+                        + stt.eta_jz.cwiseProduct(stt.gradZ * Mag.col(i));
     }
 }
 

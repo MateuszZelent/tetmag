@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -166,12 +166,8 @@ void EffFieldGPU::setMagDev( MRef& Mag ) {
 	thrust::copy(Mag.col(x).data(), Mag.col(x).data() + nx, mx_d->begin());
 	thrust::copy(Mag.col(y).data(), Mag.col(y).data() + nx, my_d->begin());
 	thrust::copy(Mag.col(z).data(), Mag.col(z).data() + nx, mz_d->begin());
-
-	thrust::copy( mx_d->begin(), mx_d->end(), mag3_n->begin() );
-	thrust::copy( my_d->begin(), my_d->end(), mag3_n->begin() + nx );
-	thrust::copy( mz_d->begin(), mz_d->end(), mag3_n->begin() + 2 * nx );
 	copyTimer.end();
-   copyTimer.add();
+	copyTimer.add();
 }
 
 void EffFieldGPU::setMagDev( const std::vector<value_type>& mag_vec ) {
@@ -180,10 +176,6 @@ void EffFieldGPU::setMagDev( const std::vector<value_type>& mag_vec ) {
   thrust::copy( mag_vec.begin(), mag_vec.begin() + nx , mx_d->begin() );
   thrust::copy( mag_vec.begin() + nx, mag_vec.begin() + 2 * nx, my_d->begin() );
   thrust::copy( mag_vec.begin() + 2 * nx, mag_vec.end() , mz_d->begin() );
-
-  thrust::copy( mx_d->begin(), mx_d->end(), mag3_n->begin() );
-  thrust::copy( my_d->begin(), my_d->end(), mag3_n->begin() + nx );
-  thrust::copy( mz_d->begin(), mz_d->end(), mag3_n->begin() + 2 * nx );
   copyTimer.end();
   copyTimer.add();
 }
@@ -194,10 +186,6 @@ void EffFieldGPU::setMagDev( const devVecD& mag_vec ) {
   thrust::copy( mag_vec.begin(), mag_vec.begin() + nx , mx_d->begin() );
   thrust::copy( mag_vec.begin() + nx, mag_vec.begin() + 2 * nx, my_d->begin() );
   thrust::copy( mag_vec.begin() + 2 * nx, mag_vec.end() , mz_d->begin() );
-
-  thrust::copy( mx_d->begin(), mx_d->end(), mag3_n->begin() );
-  thrust::copy( my_d->begin(), my_d->end(), mag3_n->begin() + nx );
-  thrust::copy( mz_d->begin(), mz_d->end(), mag3_n->begin() + 2 * nx );
   copyTimer.end();
   copyTimer.add();
 }
@@ -223,7 +211,8 @@ void EffFieldGPU::init(int nx) {
 	heffy_d = std::make_shared<dev_vec>(nx);
 	heffz_d = std::make_shared<dev_vec>(nx);
 	dxdt = std::make_shared<dev_vec>(3 * nx);
-	mag3_n = std::make_shared<dev_vec>(3 * nx);
+	H_host = std::make_shared<dev_vec>(nx);
+	invJs_d = std::make_shared<dev_vec>(nx);
 
 	dmi3 = std::make_shared<dev_vec>(3 * nx);
 	cmx1 = std::make_shared<dev_vec>(nx);
@@ -245,8 +234,6 @@ void EffFieldGPU::init(int nx) {
 	kz_mz = std::make_shared<dev_vec>(nx);
 	tmp0 = std::make_shared<dev_vec>(nx);
 	tmp1 = std::make_shared<dev_vec>(nx);
-	retVecLLG.resize(3*nx);
-//	retVecLLG_d.resize(3*nx);
 	retMatXd.resize(nx,3);
 }
 
@@ -313,6 +300,19 @@ void EffFieldGPU::setDMIdata(const VectorXd& D, const VectorXd& invNodeVol,const
 	*dmi_fac = dmi_fac3;
 };
 
+void EffFieldGPU::setInvJs(const VectorXd& invJs) {
+	thrust::copy(invJs.data(), invJs.data() + nx, invJs_d->begin());
+}
+
+void EffFieldGPU::addHostContribution(MRef& Hcpu) {
+	thrust::copy(Hcpu.col(x).data(), Hcpu.col(x).data() + nx, H_host->begin());
+	thrust::transform(heffx_d->begin(), heffx_d->end(), H_host->begin(), heffx_d->begin(), thrust::plus<value_type>());
+	thrust::copy(Hcpu.col(y).data(), Hcpu.col(y).data() + nx, H_host->begin());
+	thrust::transform(heffy_d->begin(), heffy_d->end(), H_host->begin(), heffy_d->begin(), thrust::plus<value_type>());
+	thrust::copy(Hcpu.col(z).data(), Hcpu.col(z).data() + nx, H_host->begin());
+	thrust::transform(heffz_d->begin(), heffz_d->end(), H_host->begin(), heffz_d->begin(), thrust::plus<value_type>());
+}
+
 struct LLG_functor {
   const value_type alpha;
   LLG_functor( const value_type alpha_ )  : alpha(alpha_) {}
@@ -361,74 +361,34 @@ struct LLGnoPrec_functor {
     }
 };
 
-std::vector<value_type> EffFieldGPU::LLG_noPrec_hst(MRef &Heff,	const value_type alpha) {
-	dxdt = LLG_noPrec_dev(Heff, alpha);
-	copyTimer.start();
-	thrust::copy(dxdt->begin(), dxdt->end(), retVecLLG.begin());
-	copyTimer.add();
-	return retVecLLG;
-}
 
-std::shared_ptr<dev_vec> EffFieldGPU::LLG_noPrec_dev(MRef &Heff, const value_type alpha) {
-  thrust::copy( Heff.col(x).data(), Heff.col(x).data() + nx, heffx_d->begin() );
-  thrust::copy( Heff.col(y).data(), Heff.col(y).data() + nx, heffy_d->begin() );
-  thrust::copy( Heff.col(z).data(), Heff.col(z).data() + nx, heffz_d->begin() );
-
-  thrust::for_each(
-		  thrust::make_zip_iterator(
-				  thrust::make_tuple(
-						  mx_d->begin(),  my_d->begin(),  mz_d->begin() ,
-						  dxdt->begin(),
-						  dxdt->begin() + nx,
-						  dxdt->begin() + 2 * nx,
-						  heffx_d->begin(), heffy_d->begin(), heffz_d->begin() )) ,
-		  thrust::make_zip_iterator(
-				  thrust::make_tuple(
-						  mx_d->end(),  my_d->end(), mz_d->end(),
-						  dxdt->begin() + nx ,
-						  dxdt->begin() + 2 * nx,
-						  dxdt->begin() + 3 * nx,
-						  heffx_d->end(),  heffy_d->end(), heffz_d->end() )),
-				  LLGnoPrec_functor(alpha) );
-   return dxdt;
-}
-
-
-
-std::vector<value_type> EffFieldGPU::ClassicLLG_hst(MRef& Heff, const value_type alpha) {
-	dxdt = ClassicLLG_dev(Heff, alpha);
-	copyTimer.start();
-	thrust::copy(dxdt->begin(), dxdt->end(), retVecLLG.begin());
-	copyTimer.add();
-	return retVecLLG;
-}
-
-
-std::shared_ptr<dev_vec> EffFieldGPU::ClassicLLG_dev(MRef& Heff, const value_type alpha) {
-	copyTimer.start();
-	thrust::copy(Heff.col(x).data(), Heff.col(x).data() + nx, heffx_d->begin());
-	thrust::copy(Heff.col(y).data(), Heff.col(y).data() + nx, heffy_d->begin());
-	thrust::copy(Heff.col(z).data(), Heff.col(z).data() + nx, heffz_d->begin());
-	copyTimer.end();
-	copyTimer.add();
-
+std::shared_ptr<dev_vec> EffFieldGPU::ClassicLLG_dev(const value_type alpha) {
 	thrust::for_each(
-			thrust::make_zip_iterator(
-					thrust::make_tuple(mx_d->begin(), my_d->begin(), mz_d->begin(),
-							dxdt->begin(),
-							dxdt->begin() + nx,
-							dxdt->begin() + 2 * nx,
-							heffx_d->begin(), heffy_d->begin(), heffz_d->begin())),
-			thrust::make_zip_iterator(
-					thrust::make_tuple(mx_d->end(), my_d->end(), mz_d->end(),
-							dxdt->begin() + nx,
-							dxdt->begin() + 2 * nx,
-							dxdt->begin() + 3 * nx, heffx_d->end(),
-							heffy_d->end(), heffz_d->end())),
-			LLG_functor(alpha));
+		thrust::make_zip_iterator(thrust::make_tuple(
+			mx_d->begin(), my_d->begin(), mz_d->begin(),
+			dxdt->begin(), dxdt->begin() + nx, dxdt->begin() + 2 * nx,
+			heffx_d->begin(), heffy_d->begin(), heffz_d->begin())),
+		thrust::make_zip_iterator(thrust::make_tuple(
+			mx_d->end(), my_d->end(), mz_d->end(),
+			dxdt->begin() + nx, dxdt->begin() + 2 * nx, dxdt->begin() + 3 * nx,
+			heffx_d->end(), heffy_d->end(), heffz_d->end())),
+		LLG_functor(alpha));
 	return dxdt;
 }
 
+std::shared_ptr<dev_vec> EffFieldGPU::LLG_noPrec_dev(const value_type alpha) {
+	thrust::for_each(
+		thrust::make_zip_iterator(thrust::make_tuple(
+			mx_d->begin(), my_d->begin(), mz_d->begin(),
+			dxdt->begin(), dxdt->begin() + nx, dxdt->begin() + 2 * nx,
+			heffx_d->begin(), heffy_d->begin(), heffz_d->begin())),
+		thrust::make_zip_iterator(thrust::make_tuple(
+			mx_d->end(), my_d->end(), mz_d->end(),
+			dxdt->begin() + nx, dxdt->begin() + 2 * nx, dxdt->begin() + 3 * nx,
+			heffx_d->end(), heffy_d->end(), heffz_d->end())),
+		LLGnoPrec_functor(alpha));
+	return dxdt;
+}
 
 
 struct STT_functor {
@@ -474,12 +434,6 @@ std::shared_ptr<dev_vec> EffFieldGPU::STT_term_LLG_dev(MRef &Ustt, const value_t
 	return dxdt;
 }
 
-
-std::vector<value_type> EffFieldGPU::STT_term_LLG_hst(MRef &Ustt, const value_type alpha, const value_type beta) {
-	dxdt = STT_term_LLG_dev(Ustt, alpha, beta);
-	thrust::copy(dxdt->begin(), dxdt->end(), retVecLLG.begin());
-	return retVecLLG;
-}
 
 struct torque {
   __host__ __device__
@@ -622,6 +576,56 @@ Matrix<double, Dynamic, Dynamic> EffFieldGPU::DMIField() {
 }
 
 
+void EffFieldGPU::computeAndAccumulateHeff(bool useUniaxial, bool useDMI) {
+	*heffx_d = xc_cuda->mvp(*mx_d);
+	*heffy_d = xc_cuda->mvp(*my_d);
+	*heffz_d = xc_cuda->mvp(*mz_d);
+
+	if (useUniaxial) {
+		*kx_mx = cwiseProduct(*kuAxis_x, *mx_d);
+		*ky_my = cwiseProduct(*kuAxis_y, *my_d);
+		*kz_mz = cwiseProduct(*kuAxis_z, *mz_d);
+		thrust::transform(
+			thrust::make_zip_iterator(thrust::make_tuple(kx_mx->begin(), ky_my->begin(), kz_mz->begin())),
+			thrust::make_zip_iterator(thrust::make_tuple(kx_mx->end(),   ky_my->end(),   kz_mz->end())),
+			tmp0->begin(), sumOfThree<value_type>());
+		*tmp1 = cwiseProduct(*kuVal, *tmp0);
+		thrust::transform(tmp1->begin(), tmp1->end(), tmp1->begin(), 2. * thrust::placeholders::_1);
+		*hani_x = cwiseProduct(*kuAxis_x, *tmp1);
+		*hani_y = cwiseProduct(*kuAxis_y, *tmp1);
+		*hani_z = cwiseProduct(*kuAxis_z, *tmp1);
+		thrust::transform(heffx_d->begin(), heffx_d->end(), hani_x->begin(), heffx_d->begin(), thrust::plus<value_type>());
+		thrust::transform(heffy_d->begin(), heffy_d->end(), hani_y->begin(), heffy_d->begin(), thrust::plus<value_type>());
+		thrust::transform(heffz_d->begin(), heffz_d->end(), hani_z->begin(), heffz_d->begin(), thrust::plus<value_type>());
+	}
+
+	if (useDMI) {
+		calcCurlM();
+		thrust::for_each(
+			thrust::make_zip_iterator(thrust::make_tuple(
+				mx_d->begin(), my_d->begin(), mz_d->begin(),
+				nv_surf_x->begin(), nv_surf_y->begin(), nv_surf_z->begin(),
+				surfTerm->begin(), surfTerm->begin() + nx, surfTerm->begin() + 2 * nx)),
+			thrust::make_zip_iterator(thrust::make_tuple(
+				mx_d->end(), my_d->end(), mz_d->end(),
+				nv_surf_x->end(), nv_surf_y->end(), nv_surf_z->end(),
+				surfTerm->begin() + nx, surfTerm->begin() + 2 * nx, surfTerm->begin() + 3 * nx)),
+			Cross_GPU());
+		thrust::transform(
+			thrust::make_zip_iterator(thrust::make_tuple(surfTerm->begin(), curlM->begin(), dmi_fac->begin())),
+			thrust::make_zip_iterator(thrust::make_tuple(surfTerm->end(),   curlM->end(),   dmi_fac->end())),
+			dmi3->begin(), DMI_OP());
+		thrust::transform(heffx_d->begin(), heffx_d->end(), dmi3->begin(),          heffx_d->begin(), thrust::plus<value_type>());
+		thrust::transform(heffy_d->begin(), heffy_d->end(), dmi3->begin() + nx,     heffy_d->begin(), thrust::plus<value_type>());
+		thrust::transform(heffz_d->begin(), heffz_d->end(), dmi3->begin() + 2 * nx, heffz_d->begin(), thrust::plus<value_type>());
+	}
+
+	thrust::transform(heffx_d->begin(), heffx_d->end(), invJs_d->begin(), heffx_d->begin(), thrust::multiplies<value_type>());
+	thrust::transform(heffy_d->begin(), heffy_d->end(), invJs_d->begin(), heffy_d->begin(), thrust::multiplies<value_type>());
+	thrust::transform(heffz_d->begin(), heffz_d->end(), invJs_d->begin(), heffz_d->begin(), thrust::multiplies<value_type>());
+}
+
+
 struct normalize {
 	template<class Tuple>
 	__host__ __device__
@@ -655,9 +659,6 @@ void EffFieldGPU::NormalizeMag( MatrixXd& Mag, int nx ) {
 	thrust::copy(mx_d->begin(), mx_d->end(), Mag.col(x).data());
 	thrust::copy(my_d->begin(), my_d->end(), Mag.col(y).data());
 	thrust::copy(mz_d->begin(), mz_d->end(), Mag.col(z).data());
-	thrust::copy(mx_d->begin(), mx_d->end(), mag3_n->begin());
-	thrust::copy(my_d->begin(), my_d->end(), mag3_n->begin() + nx);
-	thrust::copy(mz_d->begin(), mz_d->end(), mag3_n->begin() + 2 * nx);
 	copyTimer.end();
 	copyTimer.add();
 }

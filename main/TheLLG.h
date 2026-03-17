@@ -186,7 +186,7 @@ private:
 
     std::function<dev_vec(const dev_vec&)> selectedLLGType_GPU;
 
-    Eigen::MatrixXd effFieldsForGPU(const dev_vec&);
+    Eigen::MatrixXd assembleCpuOnlyFields();
     void selectLLGTypeGPU(int);
 #endif
 };

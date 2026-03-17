@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2023 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -55,7 +55,6 @@ class EffFieldGPU {
 private:
 	int nx;
 	Eigen::VectorXd Hxc_unrolled;
-	std::vector<value_type> retVecLLG;
 	Eigen::Matrix<value_type, Eigen::Dynamic, Eigen::Dynamic> retMatXd;
 	std::shared_ptr<SpMatCUDA> xc_cuda;
 	std::shared_ptr<SpMatCUDA> GradX_cuda, GradY_cuda, GradZ_cuda;
@@ -64,7 +63,6 @@ private:
 	std::shared_ptr<dev_vec> Hxcy_d;
 	std::shared_ptr<dev_vec> Hxcz_d;
 	std::shared_ptr<dev_vec> dxdt;
-	std::shared_ptr<dev_vec> mag3_n;
 	std::shared_ptr<dev_vec> mx_d;
 	std::shared_ptr<dev_vec> my_d;
 	std::shared_ptr<dev_vec> mz_d;
@@ -81,18 +79,14 @@ private:
 	std::shared_ptr<dev_vec> hani_x, hani_y, hani_z;
 	std::shared_ptr<dev_vec> kx_mx, ky_my, kz_mz;
 	std::shared_ptr<dev_vec> tmp0, tmp1;
+	std::shared_ptr<dev_vec> invJs_d;
+	std::shared_ptr<dev_vec> H_host;
 	Timer copyTimer;
 	void calcCurlM();
 	dev_vec cwiseProduct(const dev_vec& , const dev_vec & );
 
 
 public:
-
-//  [
-	std::vector< value_type > ClassicLLG_hst(MRef&, const value_type);
-	std::vector< value_type > LLG_noPrec_hst(MRef&, const value_type);
-	std::vector< value_type > STT_term_LLG_hst(MRef&, const value_type, const value_type);
-// ]
 
 	void setMagDev(MRef&);
 	void setMagDev(const std::vector<value_type>&);
@@ -107,11 +101,9 @@ public:
 	void setSTTDataOnDevice(const SpMat&, const SpMat&, const SpMat&,
 				const Eigen::VectorXd&,
 				const Eigen::VectorXd&,
-				const Eigen::VectorXd&);	
+				const Eigen::VectorXd&);
 	Eigen::Matrix<value_type, Eigen::Dynamic, Eigen::Dynamic> UTermSTT_GPU();
 
-	std::shared_ptr<dev_vec> ClassicLLG_dev(MRef&, const value_type);
-	std::shared_ptr<dev_vec> LLG_noPrec_dev(MRef&, const value_type);
 	std::shared_ptr<dev_vec> STT_term_LLG_dev(MRef&, const value_type, const value_type);
 
 	value_type MaxTorque(MRef&);
@@ -119,6 +111,11 @@ public:
 	void setCubicAnisotropy(const std::vector<Eigen::Matrix3d>&, const Eigen::VectorXd&, const Eigen::VectorXd&);
 	void setDMIdata(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::MatrixXd&, const Eigen::VectorXd&);
 	Eigen::Matrix<value_type, Eigen::Dynamic, Eigen::Dynamic> DMIField();
+	void setInvJs(const Eigen::VectorXd&);
+	void computeAndAccumulateHeff(bool useUniaxial, bool useDMI);
+	void addHostContribution(MRef&);
+	std::shared_ptr<dev_vec> ClassicLLG_dev(const value_type alpha);
+	std::shared_ptr<dev_vec> LLG_noPrec_dev(const value_type alpha);
 	void NormalizeMag(Eigen::MatrixXd&, int);
 	void init(int);
 

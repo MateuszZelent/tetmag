@@ -1,6 +1,6 @@
 /*
     tetmag - A general-purpose finite-element micromagnetic simulation software package
-    Copyright (C) 2016-2025 CNRS and Université de Strasbourg
+    Copyright (C) 2016-2026 CNRS and Université de Strasbourg
 
     Author: Riccardo Hertel
 
@@ -52,15 +52,19 @@ typedef thrust::device_vector<double> dev_vec;
 dev_vec TheLLG::classicVersion_GPU(const dev_vec& mag_vec)
 {
     gpucalc->setMagDev(mag_vec);
-    Heff = effFieldsForGPU(mag_vec);
-    return *gpucalc->ClassicLLG_dev(Heff, alpha);
+    gpucalc->computeAndAccumulateHeff(useUniaxial, useDMI);
+    Eigen::MatrixXd Hcpu = assembleCpuOnlyFields();
+    gpucalc->addHostContribution(Hcpu);
+    return *gpucalc->ClassicLLG_dev(alpha);
 }
 
 dev_vec TheLLG::noPrecession_GPU(const dev_vec& mag_vec)
 {
     gpucalc->setMagDev(mag_vec);
-    Heff = effFieldsForGPU(mag_vec);
-    return *gpucalc->LLG_noPrec_dev(Heff, alpha);
+    gpucalc->computeAndAccumulateHeff(useUniaxial, useDMI);
+    Eigen::MatrixXd Hcpu = assembleCpuOnlyFields();
+    gpucalc->addHostContribution(Hcpu);
+    return *gpucalc->LLG_noPrec_dev(alpha);
 }
 
 dev_vec TheLLG::sttDynamics_GPU(const dev_vec& mag_vec)
@@ -81,13 +85,13 @@ dev_vec TheLLG::sttDynamics_GPU(const dev_vec& mag_vec)
     return ret_vec_d;
 }
 
-Eigen::MatrixXd TheLLG::effFieldsForGPU(const dev_vec& mag_vec)
+Eigen::MatrixXd TheLLG::assembleCpuOnlyFields()
 {
-    std::vector<double> mag_vec_h(3 * nx);
-    thrust::copy(mag_vec.begin(), mag_vec.end(), mag_vec_h.begin());
-    Eigen::Map<const MatrixXd_CM> Mag(mag_vec_h.data(), nx, 3);
-    evaluateAllEffectiveFields(Mag);
-    return totalEffectiveField();
+    const Eigen::MatrixXd dummy;
+    if (hp.pulseIsUsed) calcPulseField(dummy);
+    if (hp.sweepIsUsed) calcSweepField(dummy);
+    if (hl.isUsed)      calcLocalField(dummy);
+    return Hext + Hdem + Hpls + Hswp + Hloc;
 }
 
 void TheLLG::selectLLGTypeGPU(int choice)

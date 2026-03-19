@@ -213,14 +213,12 @@ state_type TheLLG::sttDynamics(const state_type& mag_vec)
     const std::vector<double> LLGpart = classicVersion(mag_vec);
     Map<const MatrixXd_CM> Mag(mag_vec.data(), nx, 3);
     calcUtermSTT(Mag);
+    double pulseVal = stt.sttPulse ? stt.gaussPulseValue(timeInPs) : 0.0;
+    double currentVal = stt.dcAmplitude + stt.pulseAmplitude * pulseVal;
     const MatrixXd MxU = cross(Mag, stt.Ustt);
     ret = -(stt.beta - alpha) * MxU - (1. + alpha * stt.beta) * cross(Mag, MxU);
+    ret *= currentVal;
     Map<MatrixXd_CM>(ret_vec.data(), ret.rows(), 3) = ret;
-    if (stt.pulseIsUsed) {
-        double pulseVal = stt.gaussPulseValue(timeInPs);
-        std::transform(ret_vec.begin(), ret_vec.end(), ret_vec.begin(),
-                       [pulseVal](double& c) { return c * pulseVal; });
-    }
     std::transform(ret_vec.begin(), ret_vec.end(),
                    LLGpart.begin(), ret_vec.begin(), std::plus<double>());
     return ret_vec;

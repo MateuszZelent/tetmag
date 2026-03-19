@@ -99,9 +99,11 @@ void ProgramSpecs::initialize() {
 			("current theta", opt::value<double>()->default_value(0.), "polar angle of electric current flow direction (in degrees)")
 			("current phi", opt::value<double>()->default_value(0.), "azimuthal angle of electric current flow direction (in degrees)")
 			("stt dynamics", opt::value<bool>()->default_value(false), "use STT term in dynamic calculation [yes /no]")
-			("current pulse", opt::value<bool>()->default_value(false), "is the current applied as a pulse?")
+			("dc current", opt::value<bool>()->default_value(false), "apply a DC current in STT dynamics [yes / no]")
+			("current pulse", opt::value<bool>()->default_value(false), "apply the current as a Gaussian pulse [yes / no]")
 			("current pulse duration", opt::value<double>()->default_value(1.), "time width of Gaussian current pulse in ps")
-			("current pulse delay", opt::value<double>()->default_value(0.), "time in ps at which Gaussian current pulse reaches maximum value")			
+			("current pulse peak", opt::value<double>()->default_value(0.), "peak current density of Gaussian pulse in [10^12 A/m^2]")
+			("current pulse delay", opt::value<double>()->default_value(0.), "time in ps at which Gaussian current pulse reaches maximum value")
 			("preconditioner", opt::value<std::string>()->default_value("ILU"), "preconditioner for GPU CG solver: ILU, MCILU, GS, MCGS")
 			("current type", opt::value<std::string>()->default_value("none"), "options: PULSE, DC, or NONE")
 			("local field", opt::value<std::string>()->default_value("none"), "application of local field: NONE, PULSE, SINE, CONST")
@@ -137,49 +139,26 @@ bool ProgramSpecs::noMissingValues(){return hasRequiredValues;}
 
 
 void ProgramSpecs::evalInput() {
-	if (defaultedCurrentType) {
-		if (useSTT && !pulsedSTT) {
-			std::cout << "simulation with DC current" << std::endl;
-		}
-		if (pulsedSTT) {
-			std::cout << "simulation with pulsed current" << std::endl;
+	if (!defaultedCurrentType) {
+		if (currentType == "dc") {
+			useDC = true;
+			sttPulse = false;
 			useSTT = true;
+		} else if (currentType == "pulse") {
+			useDC = false;
+			sttPulse = true;
+			useSTT = true;
+			sttPulsePeak = jc_val;
+		} else if (currentType == "none") {
+			useDC = false;
+			sttPulse = false;
+			useSTT = false;
+		} else {
+			std::cerr << "Selected CURRENT TYPE (" << currentType << ") unknown." << std::endl;
+			exit(1);
 		}
-		return;
-	}
-
-	if (currentType == "dc") {
-		if ( pulsedSTT ) {
-			std::cout << "Conflicting information in simulation.cfg file:" << std::endl;
-			std::cout << "current pulse = " << std::boolalpha << pulsedSTT << std::endl;
-			std::cout << "current type = " << currentType << std::endl;
-			exit(0);
-		}
-		std::cout << "simulation with DC current." << std::endl;
-		useSTT = true;
-		pulsedSTT = false;
-	} else if (currentType == "pulse") {
-		std::cout << "simulation with pulsed current" << std::endl;
-		useSTT = true;
-		pulsedSTT = true;
-	} else if (currentType == "none") {
-		if (pulsedSTT) {
-			std::cout << "Conflicting information in simulation.cfg file:" << std::endl;
-			std::cout << "current pulse = " << std::boolalpha << pulsedSTT << std::endl;
-			std::cout << "current type = " << currentType << std::endl;
-			exit(0);
-		}
-		if (useSTT) {
-			std::cout << "Conflicting information in simulation.cfg file:" << std::endl;
-			std::cout << "stt dynamics = " << std::boolalpha << useSTT << std::endl;
-			std::cout << "current type = " << currentType << std::endl;
-			exit(0);
-				}
-		useSTT = false;
-		pulsedSTT = false;
 	} else {
-		std::cout << "Selected CURRENT TYPE (" << currentType << ") unknown." << std::endl;
-		exit(0);
+		useSTT = useDC || sttPulse;
 	}
 }
 
@@ -232,7 +211,9 @@ void ProgramSpecs::readFile() {
 	if (vm.count("current phi")) phi_j = vm["current phi"].as<double>();
 	if (vm.count("stt dynamics")) useSTT = vm["stt dynamics"].as<bool>();
 	if (vm.count("preconditioner")) preconditionerType = toLower(vm["preconditioner"].as<std::string>());
-	if (vm.count("current pulse")) pulsedSTT = vm["current pulse"].as<bool>();
+	if (vm.count("dc current")) useDC = vm["dc current"].as<bool>();
+	if (vm.count("current pulse")) sttPulse = vm["current pulse"].as<bool>();
+	if (vm.count("current pulse peak")) sttPulsePeak = vm["current pulse peak"].as<double>();
 	if (vm.count("current pulse delay")) sttPulseDelay = vm["current pulse delay"].as<double>();
 	if (vm.count("current pulse duration")) sttPulseWidth = vm["current pulse duration"].as<double>();
 	if (vm.count("current type")) currentType = toLower(vm["current type"].as<std::string>());
@@ -394,7 +375,11 @@ void STT::setValues(int nx, double scale, const ProgramSpecs& prog) {
 	double theta = prog.theta_j;
 	double phi = prog.phi_j;
 
-	pulseIsUsed = prog.pulsedSTT;
+	sttPulse = prog.sttPulse;
+	useDC = prog.useDC;
+	useSTT = prog.useSTT;
+	dcAmplitude = prog.useDC ? jc_val * 1.e12 : 0.0;
+	pulseAmplitude = prog.sttPulse ? prog.sttPulsePeak * 1.e12 : 0.0;
 	pulseWidth = prog.sttPulseWidth;
 	pulseDelay = prog.sttPulseDelay;
 
@@ -403,7 +388,6 @@ void STT::setValues(int nx, double scale, const ProgramSpecs& prog) {
 	jc_vec.col(x) = Eigen::VectorXd::Ones(nx) * std::sin(theta * deg2rad) * std::cos(phi*deg2rad);
 	jc_vec.col(y) = Eigen::VectorXd::Ones(nx) * std::sin(theta * deg2rad) * std::sin(phi*deg2rad);
 	jc_vec.col(z) = Eigen::VectorXd::Ones(nx) * std::cos(theta * deg2rad);
-	jc_vec *= (1.e12 * jc_val);
 	btimesMs = P * PhysicalConstants::mub  * PhysicalConstants::mu0 / (PhysicalConstants::gamma0 * PhysicalConstants::e_charge * ( 1 + beta * beta )) / scale;
 	Ustt.resize(nx, 3);
 }

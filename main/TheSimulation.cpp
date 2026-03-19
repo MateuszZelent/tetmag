@@ -142,7 +142,7 @@ void TheSimulation::start() {
 		sd.phi_Hys = prog.hystPhi;
 		if (prog.sweepUsed)
 			hys.errorMessage("sweep field");
-		if (prog.pulsedSTT)
+		if (prog.sttPulse)
 			hys.errorMessage("current type = pulse");
 		if (prog.fieldPulse)
 			hys.errorMessage("field pulse");

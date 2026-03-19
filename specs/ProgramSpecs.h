@@ -84,7 +84,11 @@ class ProgramSpecs;
 struct STT {
 	double pulseDelay;
 	double pulseWidth;
-	bool pulseIsUsed;
+	bool sttPulse;
+	bool useDC;
+	bool useSTT;
+	double dcAmplitude;
+	double pulseAmplitude;
 	SpMat gradX, gradY, gradZ;
 	Eigen::MatrixXd jc_vec;
 	double beta; // also known as xi
@@ -131,7 +135,9 @@ public:
 	bool sweepUsed;
 	std::string currentType;
 	bool defaultedCurrentType;
-	bool pulsedSTT;
+	bool sttPulse;
+	bool useDC;
+	double sttPulsePeak;
 	double sttPulseDelay;
 	double sttPulseWidth;
 	double alpha;

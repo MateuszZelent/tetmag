@@ -72,12 +72,11 @@ dev_vec TheLLG::sttDynamics_GPU(const dev_vec& mag_vec)
     dev_vec LLGpart_d = classicVersion_GPU(mag_vec);
     stt.Ustt = gpucalc->UTermSTT_GPU();
     dev_vec ret_vec_d = *gpucalc->STT_term_LLG_dev(stt.Ustt, alpha, stt.beta);
-    if (stt.pulseIsUsed) {
-        double pulseVal = stt.gaussPulseValue(timeInPs);
-        thrust::transform(ret_vec_d.begin(), ret_vec_d.end(),
-                          ret_vec_d.begin(),
-                          pulseVal * thrust::placeholders::_1);
-    }
+    double pulseVal = stt.sttPulse ? stt.gaussPulseValue(timeInPs) : 0.0;
+    double currentVal = stt.dcAmplitude + stt.pulseAmplitude * pulseVal;
+    thrust::transform(ret_vec_d.begin(), ret_vec_d.end(),
+                      ret_vec_d.begin(),
+                      currentVal * thrust::placeholders::_1);
     thrust::transform(thrust::device,
                       ret_vec_d.begin(), ret_vec_d.end(),
                       LLGpart_d.begin(), ret_vec_d.begin(),

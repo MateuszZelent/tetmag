@@ -33,12 +33,12 @@
 #define MESHWRITER_H_
 #include <Eigen/Dense>
 #include <string>
+#include <utility>
+#include <vector>
 #include <vtkSmartPointer.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkDoubleArray.h>
 #include <vtkIntArray.h>
-#include <functional>
-
 class MeshWriter {
 private:
 	Eigen::MatrixXi fel;
@@ -48,23 +48,22 @@ private:
 	unsigned nx;
 	Eigen::VectorXi NodeMaterial;
 	std::string sequenceFileName;
+	std::vector<std::pair<double, std::string>> pvdEntries;
 	vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid;
 	void defineUnstructuredVTKGrid();
-	std::function <void(MeshWriter*,int, Eigen::MatrixXd&, double, std::string)> writer;
 	void VTKwrite(int, Eigen::MatrixXd&, double, std::string);
-	void GMVwrite(int, Eigen::MatrixXd&, double, std::string);
+	void writePVD();
 	vtkSmartPointer<vtkDoubleArray> setFieldVTK(const Eigen::MatrixXd&, std::string);
 	vtkSmartPointer<vtkIntArray> setMaterialVTK(const Eigen::VectorXi& );
 	vtkSmartPointer<vtkDoubleArray> setScalarFieldVTK(const Eigen::VectorXd& , std::string );
 public:
 	void graphicsOutput(int, Eigen::MatrixXd&, double real_time = 0, std::string = "timeInPs");
 	void setSequenceFileName(int);
-	void selectWriter(std::string);
 	void outputVTK(std::string, const Eigen::MatrixXd&, double real_time = 0, std::string = "timeInPs");
-	void outputVTK(std::string, const Eigen::MatrixXd&, const Eigen::VectorXd&, std::string = "Magnetization", std::string = "scalar");
-	void outputVTK(std::string, const Eigen::MatrixXd&, const Eigen::MatrixXd&, std::string = "Magnetization", std::string = "Field 2");
-	void outputGMV(std::string, const Eigen::MatrixXd&, double real_time = 0, std::string = "timeInPs");
-	void writeBoundaryGMV(std::string, const Eigen::MatrixXi&, const Eigen::MatrixXd&);
+	void addVectorVTK(const Eigen::MatrixXd&, std::string);
+	void addScalarVTK(const Eigen::VectorXd&, std::string);
+	void closeVTK();
+	void writeBoundaryVTK(const Eigen::MatrixXi&, const Eigen::MatrixXd&);
 //	void outputVTPolydata(std::string, const Eigen::MatrixXd&, double real_time = 0);
 	MeshWriter(){};
 	MeshWriter(const Eigen::MatrixXi&, const Eigen::MatrixXd&, std::string, Eigen::VectorXi);

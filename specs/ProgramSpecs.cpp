@@ -74,8 +74,7 @@ void ProgramSpecs::initialize() {
 			("log stride", opt::value<double>()->default_value(2), "output in log file")
 			("config stride", opt::value<double>()->default_value(10), "output of spin configuration")
 			("console stride", opt::value<double>()->default_value(10), "output in console")
-			("writer type", opt::value<std::string>()->default_value("VTK"),"graphics output format: VTK or GMV.")
-			("external field", opt::value<double>()->default_value(0.), "external field in mT.")
+("external field", opt::value<double>()->default_value(0.), "external field in mT.")
 			("theta_H", opt::value<double>()->default_value(0.), "polar angle Hext direction (in degrees).")
 			("phi_H", opt::value<double>()->default_value(0.), "azimuth angle Hext direction (in degrees).")
 			("freeze demag", opt::value<bool>()->default_value(true), "separate demag field calculation from LLG integration (faster)")
@@ -185,8 +184,7 @@ void ProgramSpecs::readFile() {
 	if (vm.count("log stride")) logStride = vm["log stride"].as<double>();
 	if (vm.count("config stride")) cfgStride = vm["config stride"].as<double>();
 	if (vm.count("console stride")) consoleStride = vm["console stride"].as<double>();
-	if (vm.count("writer type")) writerType = toLower(vm["writer type"].as<std::string>());
-	if (vm.count("external field")) Hext = vm["external field"].as<double>();
+if (vm.count("external field")) Hext = vm["external field"].as<double>();
 	if (vm.count("theta_H")) theta_H = vm["theta_H"].as<double>();
 	if (vm.count("phi_H")) phi_H = vm["phi_H"].as<double>();
 	if (vm.count("freeze demag")) freezeDemag = vm["freeze demag"].as<bool>();

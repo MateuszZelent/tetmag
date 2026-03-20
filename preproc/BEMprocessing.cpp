@@ -334,7 +334,7 @@ void BEMprocessing::preProcess(bool useH2, std::string name) {
 void BEMprocessing::outputBoundary() {
 	prepareLocalBoundaryMatrices();
 	MeshWriter writer;
-	writer.writeBoundaryGMV("boundary.gmv", bel_b, bxyz);
+	writer.writeBoundaryVTK(bel_b, bxyz);
 }
 
 

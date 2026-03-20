@@ -43,6 +43,7 @@
 #include <vtkXMLPolyDataWriter.h>
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 #include <fstream>
 using namespace Eigen;
 
@@ -53,16 +54,7 @@ MeshWriter::MeshWriter(const MatrixXi& fel, const MatrixXd& xyz, std::string nam
 
 
 void MeshWriter::graphicsOutput(int n,  MatrixXd& vec, double scalar, std::string scalarName) {
-	writer(this, n, vec, scalar, scalarName);
-}
-
-
-void MeshWriter::selectWriter(std::string type) {
-	if (type == "gmv") {
-		writer = &MeshWriter::GMVwrite;
-	} else {
-		writer = &MeshWriter::VTKwrite;
-	}
+	VTKwrite(n, vec, scalar, scalarName);
 }
 
 
@@ -89,6 +81,29 @@ void MeshWriter::defineUnstructuredVTKGrid() {
 void MeshWriter::VTKwrite(int n, MatrixXd& vec, double t, std::string scalarName) {
 	setSequenceFileName(n);
 	outputVTK(sequenceFileName, vec, t, scalarName);
+	std::string vtuFile = sequenceFileName + ".vtu";
+	size_t slashPos = vtuFile.find_last_of('/');
+	std::string baseName = (slashPos == std::string::npos) ? vtuFile : vtuFile.substr(slashPos + 1);
+	pvdEntries.push_back({t, baseName});
+	writePVD();
+}
+
+
+void MeshWriter::writePVD() {
+	std::ofstream pvd(name + ".pvd");
+	if (!pvd) {
+		std::cerr << "Could not open " << name << ".pvd for writing." << std::endl;
+		return;
+	}
+	pvd << "<?xml version=\"1.0\"?>\n";
+	pvd << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+	pvd << "  <Collection>\n";
+	for (const std::pair<double, std::string>& entry : pvdEntries) {
+		pvd << "    <DataSet timestep=\"" << std::setprecision(10) << entry.first
+		    << "\" part=\"0\" file=\"" << entry.second << "\"/>\n";
+	}
+	pvd << "  </Collection>\n";
+	pvd << "</VTKFile>\n";
 }
 
 
@@ -98,43 +113,6 @@ void MeshWriter::setSequenceFileName(int fileNumber) {
 	sequenceFileName = ss.str();
 }
 
-
-void MeshWriter::GMVwrite(int n, MatrixXd& vec, double t, std::string scalarName) {
-	setSequenceFileName(n);
-	outputGMV(sequenceFileName, vec, t, scalarName);
-}
-
-
-void MeshWriter::outputGMV(std::string filename, const MatrixXd& vec, double t, std::string scalarName ) {
-	enum Coords { x, y, z };
-	std::ofstream fs;
-	fs.open(filename);
-	if(!fs) {
-		std::cerr << "File " << filename << " could not be opened." << std::endl;
-		exit(0);
-	}
-	fs << "gmvinput ascii\n\n";
-	fs << "nodes " << nx << "\n";
-	fs << xyz.col(x).transpose() << "\n";
-	fs << xyz.col(y).transpose() << "\n";
-	fs << xyz.col(z).transpose() << "\n\n";
-	fs << "cells " << ntet << "\n\n";
-	for (unsigned i = 0; i < ntet; ++i) {
-		fs << "tet 4 " << fel.row(i) + RowVector4i::Ones(4) << "\n"; // convert to one-based indexing
-	}
-	fs << "\n";
-	fs << "material 1 1 \nMaterial\n";
-	VectorXi mats = NodeMaterial + VectorXi::Ones(nx);
-	fs << mats.transpose() << "\n\n";
-	fs << "velocity 1\n";
-	fs << vec.col(x).transpose() << "\n";
-	fs << vec.col(y).transpose() << "\n";
-	fs << vec.col(z).transpose() << "\n\n";
-//	fs << "probtime \n" << t << std::endl;
-	fs << scalarName << "\n" << t << std::endl;
-	fs << "endgmv\n";
-	fs.close();
-}
 
 
 vtkSmartPointer<vtkDoubleArray> MeshWriter::setFieldVTK(const MatrixXd& vec, std::string fieldName) {
@@ -180,9 +158,8 @@ void MeshWriter::outputVTK(std::string filename, const MatrixXd& vec, double tim
 	vtkSmartPointer<vtkIntArray> mat = setMaterialVTK(NodeMaterial);
 	unstructuredGrid->GetPointData()->SetScalars(mat);
 
-	// store time data:
-//	std::string valueName = "time in ps";
-	vtkSmartPointer<vtkDoubleArray> time_ps =  vtkSmartPointer<vtkDoubleArray>::New();
+	unstructuredGrid->GetFieldData()->Initialize();
+	vtkSmartPointer<vtkDoubleArray> time_ps = vtkSmartPointer<vtkDoubleArray>::New();
 	time_ps->SetNumberOfComponents(1);
 	time_ps->SetName(scalarName.c_str());
 	time_ps->InsertNextValue(timeValue);
@@ -196,68 +173,48 @@ void MeshWriter::outputVTK(std::string filename, const MatrixXd& vec, double tim
 }
 
 
-void MeshWriter::outputVTK(std::string filename, const MatrixXd& vec, const VectorXd& scalar, std::string fieldname_1, std::string fieldname_2) {
-	filename += ".vtu";
-
-  // store vector field:
-  vtkSmartPointer<vtkDoubleArray> m = setFieldVTK(vec, fieldname_1);
-  unstructuredGrid->GetPointData()->SetVectors(m);
-
-  // store scalar field
-  vtkSmartPointer<vtkDoubleArray> s = setScalarFieldVTK(scalar, fieldname_2);
-  unstructuredGrid->GetPointData()->SetScalars(s);
-
-  // write file:
-  vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
-  writer->SetFileName(filename.c_str());
-  writer->SetInputData(unstructuredGrid);
-  writer->Write();
+void MeshWriter::addVectorVTK(const MatrixXd& F, std::string fieldName) {
+	vtkSmartPointer<vtkDoubleArray> fld = setFieldVTK(F, fieldName);
+	unstructuredGrid->GetPointData()->AddArray(fld);
 }
 
 
-void MeshWriter::outputVTK(std::string filename, const MatrixXd& vec, const MatrixXd& field, std::string fieldname_1, std::string fieldname_2) { // version with two fields
-	filename += ".vtu";
-	std::cout << "Writing file: " << filename << std::endl;
+void MeshWriter::addScalarVTK(const VectorXd& F, std::string fieldName) {
+	vtkSmartPointer<vtkDoubleArray> fld = setScalarFieldVTK(F, fieldName);
+	unstructuredGrid->GetPointData()->AddArray(fld);
+}
 
-	// store magnetization field:
-	vtkSmartPointer<vtkDoubleArray> m = setFieldVTK(vec, fieldname_1);
-	unstructuredGrid->GetPointData()->SetVectors(m);
 
-	// store material
-	vtkSmartPointer < vtkIntArray > mat = setMaterialVTK(NodeMaterial);
-	unstructuredGrid->GetPointData()->SetScalars(mat);
-
-	// store additional field
-	vtkSmartPointer<vtkDoubleArray> s = setFieldVTK(field, fieldname_2);
-	unstructuredGrid->GetPointData()->AddArray(s);
-
-	// write file:
-	vtkSmartPointer < vtkXMLUnstructuredGridWriter > writer = vtkSmartPointer < vtkXMLUnstructuredGridWriter > ::New();
+void MeshWriter::closeVTK() {
+	std::string filename = name + ".vtu";
+	vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
 	writer->SetFileName(filename.c_str());
 	writer->SetInputData(unstructuredGrid);
+	writer->Write();
+	unstructuredGrid->GetPointData()->Initialize();
+	unstructuredGrid->GetFieldData()->Initialize();
+}
+
+
+void MeshWriter::writeBoundaryVTK(const MatrixXi& bel_b, const MatrixXd& bxyz) {
+	uint bnx = bxyz.rows();
+	uint nbel = bel_b.rows();
+	vtkSmartPointer<vtkUnstructuredGrid> grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+	points->SetNumberOfPoints(bnx);
+	for (uint i = 0; i < bnx; ++i) {
+		points->SetPoint(i, bxyz(i, 0), bxyz(i, 1), bxyz(i, 2));
+	}
+	grid->SetPoints(points);
+	vtkIdType ptIds[3];
+	for (uint j = 0; j < nbel; ++j) {
+		for (int k = 0; k < 3; ++k) ptIds[k] = bel_b(j, k);
+		grid->InsertNextCell(VTK_TRIANGLE, 3, ptIds);
+	}
+	vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
+	writer->SetFileName("boundary.vtu");
+	writer->SetInputData(grid);
 	writer->Write();
 }
 
 
-void MeshWriter::writeBoundaryGMV(std::string filename, const MatrixXi& bel_b, const MatrixXd& bxyz) {
-	enum coords { x, y, z };
-	std::ofstream bnd(filename);
-	uint bnx = bxyz.rows();
-	uint nbel = bel_b.rows();
-	if (!bnd) {
-		std::cerr << "File " << filename << " could not be opened."	<< std::endl;
-		exit(0);
-	}
-	bnd << "gmvinput ascii\n\n";
-	bnd << "nodes " << bnx << "\n";
-	bnd << bxyz.col(x).transpose() << "\n";
-	bnd << bxyz.col(y).transpose() << "\n";
-	bnd << bxyz.col(z).transpose() << "\n\n";
-	bnd << "cells " << nbel << "\n\n";
-	for (unsigned i = 0; i < nbel; ++i) {
-		bnd << "tri 3 " << bel_b.row(i) + RowVector3i::Ones(3) << "\n"; // convert to one-based indexing
-	}
-	bnd << "\n";
-	bnd << "\nendgmv\n";
-	bnd.close();
-}

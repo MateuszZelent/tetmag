@@ -152,7 +152,6 @@ public:
 	std::string solverType;
 	std::string preconditionerType;
 	int deviceNumber;
-	std::string writerType;
 	std::string localField;
 	bool useH2;
 	bool resuming;

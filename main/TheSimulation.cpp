@@ -153,7 +153,6 @@ void TheSimulation::start() {
 	}
 	//
 
-	write.selectWriter(prog.writerType);
 	std::vector<double> mag_vec(3 * nx);
 	enum choice {
 		noPrecession, usualLLG, stt
@@ -275,15 +274,13 @@ void TheSimulation::start() {
 		calculateEnergies(std::ref(LLG), std::ref(demag), calcDemag);
 		writeLogStream(logstream, elapsed_ps, maximumTorque);
 		displayEnergies(elapsed_ps);
-		if (prog.writerType == "GMV") {
-			write.outputGMV(msh.name + ".gmr", mag);
-		} else {
-		write.outputVTK(msh.name, mag, demag.calcField(mag), "Magnetization", "Demag"); 
-		}
+		write.addVectorVTK(mag, "Magnetization");
+		write.addVectorVTK(demag.calcField(mag), "Demag");
+		write.closeVTK();
 
 		if (sd.Hys) {
 			std::string hysOutfile = "hys_" + hys.getHysFileName(msh.name);
-			write.outputVTK(hysOutfile, mag, sd.H_Hys, "external field");
+			write.outputVTK(hysOutfile, mag, sd.H_Hys, "external field [T]");
 			hys.moveFile(hysOutfile + ".vtu");
 			hys.writeHysData(msh.NodeVolume, totalVolume, mag);
 			writeLogStream(hys.hystLogFile, elapsed_ps, maximumTorque);

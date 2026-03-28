@@ -37,7 +37,6 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation prefix" FORCE)
 endif()
 set(INSTALL_BIN_DIR "bin" CACHE PATH "")
-set(INSTALL_LIB_DIR "lib" CACHE PATH "")
 set(INSTALL_LIB_SUBDIR "lib/tetmag" CACHE PATH "")
 
 
@@ -164,11 +163,8 @@ set(PREPROC_FILES
   ${PREPROC}LindholmCWrapper.cpp
 )
 
-add_library(prep STATIC ${PREPROC_FILES})
-set(PREPLIB prep)
-target_link_libraries(${PREPLIB} Eigen3::Eigen VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
-
 set(TETMAG_FILES
+  ${PREPROC_FILES}
   ${MAIN}tetmag.cpp
   ${MAIN}AMGCLSolver.cpp
   ${UTILS}auxiliaries.cpp
@@ -225,7 +221,7 @@ if(TARGET Boost::system)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE ${H2LIB} mshio ${CVODELIB})
 target_link_libraries(${PROJECT_NAME} PRIVATE VTK::CommonCore VTK::CommonDataModel VTK::IOXML VTK::IOLegacy)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PREPLIB} ${NCDF})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${NCDF})
 
 if(USE_OpenMP)
   target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
@@ -261,8 +257,6 @@ install(TARGETS ${PROJECT_NAME}
 # Manifest
 install(CODE "file(WRITE ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_BIN_DIR}/tetmag\\n\")")
-install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_DIR}/libprep.a\\n\")")
-install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${GMSH_LIB_VERSION}\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libh2.a\\n\")")
 install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt \"${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR}/libsundials_cvode.a\\n\")")
 if(USE_CUDA)
@@ -277,10 +271,10 @@ install(CODE "file(APPEND ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.
 if(NOT TARGET uninstall)
   add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -E echo "Uninstalling tetmag..."
-    COMMAND xargs rm -f < ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
+    COMMAND sh -c "xargs rm -f < ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt"
     COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/share/tetmag/install_manifest.txt
-    COMMAND find ${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR} -type d -empty -delete
-    COMMAND find ${CMAKE_INSTALL_PREFIX}/share/tetmag -type d -empty -delete
+    COMMAND sh -c "find ${CMAKE_INSTALL_PREFIX}/${INSTALL_LIB_SUBDIR} -type d -empty -delete"
+    COMMAND sh -c "find ${CMAKE_INSTALL_PREFIX}/share/tetmag -type d -empty -delete"
     COMMAND ${CMAKE_COMMAND} -E echo "Uninstallation complete."
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Uninstalling tetmag files."

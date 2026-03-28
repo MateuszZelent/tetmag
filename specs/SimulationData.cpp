@@ -68,11 +68,10 @@ void SimulationData::getProgramData(ProgramSpecs& prog) {
 	Hp.pulsePeak /= 1000.; // convert input data from mT to T
 	Hp.sweepStart /= 1000.;
 	Hp.sweepEnd /= 1000.;
-	Hl = prog.getHloc();
-	Hl.frequency /= 1.e3; // convert input data form GHz to 1/ps
-	Hl.omega = 2. * PhysicalConstants::pi * Hl.frequency;
-	Hl.amplitude /= 1000.; // convert input data from mT to T
-	Hl.amplitude /= PhysicalConstants::mu0; // convert [T] to [A/m]
+	Hp.rfAmplitude /= 1000.; // convert input data from mT to T
+	Hp.rfFrequency /= 1.e3;  // convert input data from GHz to 1/ps
+	Hp.rfOmega = 2. * PhysicalConstants::pi * Hp.rfFrequency;
+	Hp.staticLocalAmplitude /= PhysicalConstants::mu0; // convert T -> A/m
 	useGPU = (prog.solverType == "gpu" || prog.solverType == "pl");
 	gamma = prog.gamma;
 
@@ -92,33 +91,35 @@ void SimulationData::allocateMaterialVectors() {
 }
 
 
-void SimulationData::readLocalFieldProfile() {
-	if (!Hl.isUsed) return;
+void SimulationData::readFieldProfile() {
+	bool needProfile = Hp.pulseHasProfile || Hp.rfHasProfile || Hp.staticLocalIsUsed;
+	if (!needProfile) return;
 	std::string profileFileName = "fieldProfile.vtu";
 	if (!fileExists(profileFileName)) {
-		std::cout << "ERROR: Option for local field excitation selected, but no file with local field profile found.\n";
-		std::cout << "Prepare a file named \"fieldProfile.vtu\" with the field profile information, or deselect the option." << std::endl;
+		std::cerr << "ERROR: Spatial profile option selected, but 'fieldProfile.vtu' not found." << std::endl;
+		std::cerr << "Provide the file or disable profile options." << std::endl;
 		exit(1);
-		return;
 	}
 	VTKReader r(profileFileName);
 	MatrixXd Profile = r.readMag();
 	bool goodNodes = r.checkNodeNumber(nx);
 	if (!goodNodes) {
-		std::cout << "Please provide a compatible '" << profileFileName << "' file, or deselect the the 'local field' option." << std::endl;
+		std::cerr << "Node count mismatch in 'fieldProfile.vtu'." << std::endl;
 		exit(1);
 	}
-
-	// ToDo: replace this with a more user-friendly file reader / input routine for the "profile" option. //
 	double maxVal = Profile.rowwise().norm().maxCoeff();
-	if (areEqual(maxVal, 0.))  {
-		std::cout << "ZERO field profile detected. Not using local field." << std::endl;
-	    Hl.isUsed = false;
-	    return;
+	if (areEqual(maxVal, 0.)) {
+		std::cerr << "ZERO field profile detected. Disabling profile options." << std::endl;
+		Hp.pulseHasProfile   = false;
+		Hp.rfHasProfile      = false;
+		Hp.staticLocalIsUsed = false;
+		return;
 	}
 	Profile /= maxVal;
-	Hl.setProfile(Profile);
-	std::cout << "Using local field profile." << std::endl;
+	Hp.fieldProfile = Profile;
+	if (Hp.staticLocalIsUsed)
+		Hp.staticLocalH = Profile * Hp.staticLocalAmplitude;
+	std::cout << "Using spatial field profile from '" << profileFileName << "'." << std::endl;
 }
 
 

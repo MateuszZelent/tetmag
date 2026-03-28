@@ -55,27 +55,20 @@ struct Hdynamic {
 	Eigen::MatrixXd pulseH;
 	double sweepFieldValue(double);
 	Eigen::MatrixXd sweepH;
-};
-
-class Hlocal {
-private:
-	Eigen::MatrixXd gaussPulseValue(const double);
-	Eigen::MatrixXd sineFieldValue(const double);
-	Eigen::MatrixXd constantValue(const double);
-	Eigen::MatrixXd Profile;
-public:
-	double omega;
-	bool isUsed;
-	std::string type;
-	double frequency;
-	double amplitude;
-	double pulseWidth;
-	double pulseDelay;
-	std::function <Eigen::MatrixXd(const double)> localField;
-	void setValueFunction();
-	void setProfile(const Eigen::MatrixXd&);
-	void printData();
-	Eigen::MatrixXd getSpatialProfile();
+	bool rfIsUsed;
+	double rfAmplitude;
+	double rfFrequency;
+	double rfOmega;
+	double rfTheta;
+	double rfPhi;
+	double rfFieldValue(double);
+	Eigen::MatrixXd rfH;
+	bool pulseHasProfile;
+	bool rfHasProfile;
+	bool staticLocalIsUsed;
+	double staticLocalAmplitude;
+	Eigen::MatrixXd fieldProfile;
+	Eigen::MatrixXd staticLocalH;
 };
 
 class ProgramSpecs;
@@ -125,14 +118,18 @@ private:
 	double sweepPhi;
 	double sweepDuration;
 	void evalInput();
-	double localPulseDelay;
-	double localPulseWidth;
-	double localFrequency;
-	double localAmplitude;
-	std::string localFieldType;
+	double rfAmplitude;
+	double rfFrequency;
+	double rfTheta;
+	double rfPhi;
+	bool pulseProfileUsed;
+	bool rfProfileUsed;
+	double staticLocalAmplitude;
 public:
 	bool fieldPulse;
 	bool sweepUsed;
+	bool rfUsed;
+	bool staticLocalUsed;
 	std::string currentType;
 	bool defaultedCurrentType;
 	bool sttPulse;
@@ -152,7 +149,6 @@ public:
 	std::string solverType;
 	std::string preconditionerType;
 	int deviceNumber;
-	std::string localField;
 	bool useH2;
 	bool resuming;
 	double initialTime;
@@ -168,7 +164,6 @@ public:
 	bool noDemag;
 	std::string meshType;
 	Hdynamic getHdyn();
-	Hlocal getHloc();
 	double P;
 	double jc_val;
 	double beta;
@@ -179,7 +174,6 @@ public:
 	double firstField, lastField;
 	double hystPhi, hystTheta;
 	double hystStart, hystEnd, deltaH;
-	Hlocal hl;
 	double cgTol;	
 	bool showTimer;
 	double gamma;

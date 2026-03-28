@@ -146,10 +146,10 @@ void TheSimulation::start() {
 			hys.errorMessage("current type = pulse");
 		if (prog.fieldPulse)
 			hys.errorMessage("field pulse");
-		if (prog.hl.type == "pulse")
-			hys.errorMessage("local field = pulse");
-		if (prog.hl.type == "sine")
-			hys.errorMessage("local field = sine");
+		if (prog.rfUsed)
+			hys.errorMessage("rf field");
+		if (prog.staticLocalUsed)
+			hys.errorMessage("local static field");
 	}
 	//
 

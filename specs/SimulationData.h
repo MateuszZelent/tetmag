@@ -64,8 +64,7 @@ public:
 	void scaleToRealSize();
 	void setMaterialParametersAtNodes(MeshData&, std::vector<Material>& );
 	Hdynamic Hp;
-	Hlocal Hl;
-	void readLocalFieldProfile();
+	void readFieldProfile();
 	bool useGPU;
 	double gamma;
 };

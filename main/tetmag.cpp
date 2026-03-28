@@ -120,7 +120,7 @@ exit(0);
 	sd.getProgramData(prog);
 	sd.scaleToRealSize();
 	msh.selectAnisotropicSurfaces(sd.Ks);
-	sd.readLocalFieldProfile();
+	sd.readFieldProfile();
 
 // simulation
 	TheSimulation sim(sd, msh, prog); 

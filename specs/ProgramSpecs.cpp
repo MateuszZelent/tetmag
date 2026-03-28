@@ -105,11 +105,15 @@ void ProgramSpecs::initialize() {
 			("current pulse delay", opt::value<double>()->default_value(0.), "time in ps at which Gaussian current pulse reaches maximum value")
 			("preconditioner", opt::value<std::string>()->default_value("ILU"), "preconditioner for GPU CG solver: ILU, MCILU, GS, MCGS")
 			("current type", opt::value<std::string>()->default_value("none"), "options: PULSE, DC, or NONE")
-			("local field", opt::value<std::string>()->default_value("none"), "application of local field: NONE, PULSE, SINE, CONST")
-			("local field amplitude", opt::value<double>()->default_value(0), "maximum value of local field in mT")
-			("local field frequency", opt::value<double>()->default_value(0), "frequency of local sinusoidal field in GHz")
-			("local pulse duration", opt::value<double>()->default_value(1.), "time width of local field pulse in ps")
-			("local pulse delay", opt::value<double>()->default_value(0), "time in ps at which local Gaussian field pulse is at maximum")
+			("rf field", opt::value<bool>()->default_value(false), "apply sinusoidal RF field (yes / no)")
+			("rf amplitude", opt::value<double>()->default_value(0.), "amplitude of RF field in mT")
+			("rf frequency", opt::value<double>()->default_value(0.), "frequency of RF field in GHz")
+			("rf theta", opt::value<double>()->default_value(0.), "polar angle of RF field direction (in degrees)")
+			("rf phi", opt::value<double>()->default_value(0.), "azimuthal angle of RF field direction (in degrees)")
+			("rf profile", opt::value<bool>()->default_value(false), "modulate RF field spatially using fieldProfile.vtu")
+			("pulse profile", opt::value<bool>()->default_value(false), "modulate field pulse spatially using fieldProfile.vtu")
+			("local static field", opt::value<bool>()->default_value(false), "apply spatially varying static field from fieldProfile.vtu")
+			("local static amplitude", opt::value<double>()->default_value(0.), "amplitude of local static field in mT")
 			("hysteresis", opt::value<bool>()->default_value(false), "calculate hysteresis through a sequence of states (yes / no)")
 			("initial field", opt::value<double>()->default_value(0.), "initial field value of hysteresis [mT]")
 			("final field", opt::value<double>()->default_value(0.), "final field value of hysteresis [mT]")
@@ -215,11 +219,15 @@ if (vm.count("external field")) Hext = vm["external field"].as<double>();
 	if (vm.count("current pulse delay")) sttPulseDelay = vm["current pulse delay"].as<double>();
 	if (vm.count("current pulse duration")) sttPulseWidth = vm["current pulse duration"].as<double>();
 	if (vm.count("current type")) currentType = toLower(vm["current type"].as<std::string>());
-	if (vm.count("local field")) localFieldType = toLower(vm["local field"].as<std::string>());
-	if (vm.count("local field amplitude")) localAmplitude = vm["local field amplitude"].as<double>();
-	if (vm.count("local field frequency")) localFrequency = vm["local field frequency"].as<double>();
-	if (vm.count("local pulse duration")) localPulseWidth = vm["local pulse duration"].as<double>();
-	if (vm.count("local pulse delay")) localPulseDelay = vm["local pulse delay"].as<double>();
+	if (vm.count("rf field")) rfUsed = vm["rf field"].as<bool>();
+	if (vm.count("rf amplitude")) rfAmplitude = vm["rf amplitude"].as<double>();
+	if (vm.count("rf frequency")) rfFrequency = vm["rf frequency"].as<double>();
+	if (vm.count("rf theta")) rfTheta = vm["rf theta"].as<double>();
+	if (vm.count("rf phi")) rfPhi = vm["rf phi"].as<double>();
+	if (vm.count("rf profile")) rfProfileUsed = vm["rf profile"].as<bool>();
+	if (vm.count("pulse profile")) pulseProfileUsed = vm["pulse profile"].as<bool>();
+	if (vm.count("local static field")) staticLocalUsed = vm["local static field"].as<bool>();
+	if (vm.count("local static amplitude")) staticLocalAmplitude = vm["local static amplitude"].as<double>();
 	if (vm.count("hysteresis")) useHyst = vm["hysteresis"].as<bool>();
 	if (vm.count("initial field")) firstField = vm["initial field"].as<double>();
 	if (vm.count("final field")) lastField = vm["final field"].as<double>();
@@ -252,72 +260,6 @@ void ProgramSpecs::noFileError() {
 }
 
 
-void Hlocal::setProfile(const Eigen::MatrixXd& Profile_) {
-	Profile = Profile_;
-}
-
-
-Eigen::MatrixXd Hlocal::gaussPulseValue(const double t) {
-	const double sigma = (t - pulseDelay) / pulseWidth;
-	const double xpnt = (sigma * sigma) / 2.;
-	return Profile * amplitude * std::exp(-xpnt);
-} 
-
-
-Eigen::MatrixXd Hlocal::sineFieldValue(const double t) {
-	return Profile * amplitude * std::cos(omega * t);
-}
-
-
-Eigen::MatrixXd Hlocal::constantValue(const double) {
-	return Profile * amplitude;
-}
-
-
-void Hlocal::setValueFunction() {
-	if (type == "pulse") {
-		localField = [this](const double t)-> Eigen::MatrixXd {return gaussPulseValue(t);};
-	} else if (type == "sine") {
-		localField = [this](const double t)-> Eigen::MatrixXd {return sineFieldValue(t);};
-	} else {
-		localField = [this](const double t)-> Eigen::MatrixXd {return constantValue(t);};
-	}
-}
-
-
-void Hlocal::printData() {
-	std::cout << "type: " << type << "\n";
-	std::cout << "amplitude: " << amplitude * PhysicalConstants::mu0 * 1000. << " mT\n";
-	std::cout << "frequency: " << frequency << " ps^-1" << std::endl;
-	std::cout << "delay: " << pulseDelay << " ps" << std::endl;
-	std::cout << "duration: " << pulseWidth << " ps" << std::endl;
-	std::cout << "use local data: " << std::boolalpha << isUsed << std::endl;
-	std::cout << "Profile, row 42: " << Profile.row(42) << std::endl;
-}
-
-
-Eigen::MatrixXd Hlocal::getSpatialProfile() {
-	return Profile;
-}
-
-
-Hlocal ProgramSpecs::getHloc() {
-	hl.amplitude = localAmplitude;
-	hl.frequency = localFrequency;
-	
-	hl.pulseDelay = localPulseDelay;
-	hl.pulseWidth = localPulseWidth;
-	hl.type = localFieldType;
-	hl.isUsed = (hl.type == "const" || hl.type == "pulse" || hl.type == "sine");
-	if (!hl.isUsed && hl.type != "none") {
-		std::cout << "Local field option '" << hl.type << "' not understood." << std::endl;
-		std::cout << "Not using any local field." << std::endl;
-	}
-	hl.getSpatialProfile();
-	return hl;
-}
-
-
 Hdynamic ProgramSpecs::getHdyn() {
 //	enum Coords {	x, y, z 	};
 	Hdynamic hp;
@@ -333,6 +275,15 @@ Hdynamic ProgramSpecs::getHdyn() {
 	hp.sweepDuration = sweepDuration;
 	hp.sweepTheta = sweepTheta * PhysicalConstants::pi / 180.;
 	hp.sweepPhi = sweepPhi * PhysicalConstants::pi / 180.;
+	hp.rfIsUsed = rfUsed;
+	hp.rfAmplitude = rfAmplitude;
+	hp.rfFrequency = rfFrequency;
+	hp.rfTheta = rfTheta * PhysicalConstants::pi / 180.;
+	hp.rfPhi = rfPhi * PhysicalConstants::pi / 180.;
+	hp.pulseHasProfile = pulseProfileUsed;
+	hp.rfHasProfile = rfProfileUsed;
+	hp.staticLocalIsUsed = staticLocalUsed;
+	hp.staticLocalAmplitude = staticLocalAmplitude / 1000.;
 
 /*
 	hp.pulseDir(x)= std::sin(hp.theta) * std::cos(hp.phi);
@@ -359,6 +310,11 @@ double Hdynamic::sweepFieldValue(double t) {
 		if ((fieldValue > sweepEnd  && slope > 0.) || (fieldValue < sweepEnd  && slope < 0.)) fieldValue = sweepEnd;
 		return fieldValue;
 	}
+
+
+double Hdynamic::rfFieldValue(double t) {
+	return rfAmplitude * std::cos(rfOmega * t);
+}
 
 
 STT::STT(SpMat gradX_, SpMat gradY_, SpMat gradZ_) :

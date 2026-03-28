@@ -63,7 +63,6 @@ TheLLG::TheLLG(SimulationData& sd, const MeshData& msh, int LLGVersion)
       alpha(sd.alpha),
       Js(sd.Js),
       hp(sd.Hp),
-      hl(sd.Hl),
       freezeDemag(true)
 {
     useGPU = sd.useGPU;
@@ -78,7 +77,6 @@ TheLLG::TheLLG(SimulationData& sd, const MeshData& msh, int LLGVersion)
     refresh_time = 0.1;
 
     heffTimer.reset();
-    hl.setValueFunction();
     selectLLGType(LLGVersion);
 
     invNodeVol = NodeVolume.cwiseInverse();
@@ -92,7 +90,8 @@ TheLLG::TheLLG(SimulationData& sd, const MeshData& msh, int LLGVersion)
     Hpls  = MatrixXd::Zero(nx, 3);
     Hswp  = MatrixXd::Zero(nx, 3);
     Hdem  = MatrixXd::Zero(nx, 3);
-    Hloc  = MatrixXd::Zero(nx, 3);
+    Hstat = MatrixXd::Zero(nx, 3);
+    Hrf   = MatrixXd::Zero(nx, 3);
     ret   = MatrixXd::Zero(nx, 3);
     ret_vec.resize(ret.size());
 
@@ -133,8 +132,10 @@ TheLLG::TheLLG(SimulationData& sd, const MeshData& msh, int LLGVersion)
 #endif
     JsVol = Js.cwiseProduct(NodeVolume);
 
-    if (hp.pulseIsUsed || hp.sweepIsUsed)
+    if (hp.pulseIsUsed || hp.sweepIsUsed || hp.rfIsUsed || hp.pulseHasProfile || hp.rfHasProfile)
         setHdynField();
+    if (hp.staticLocalIsUsed)
+        Hstat = hp.staticLocalH;
 
     totalVolume = NodeVolume.sum();
     selectEffectiveFields();
@@ -251,11 +252,11 @@ void TheLLG::selectEffectiveFields()
     if (useSurfaceAnisotropy)
         calcEffectiveField.emplace_back([this](MRef& m) { calcSurfaceAnisotropyField(m); });
     if (hp.pulseIsUsed)
-        calcEffectiveField.emplace_back([this](MRef& m) { calcPulseField(m); });
+        calcEffectiveField.emplace_back([this](MRef&) { calcPulseField(); });
     if (hp.sweepIsUsed)
-        calcEffectiveField.emplace_back([this](MRef& m) { calcSweepField(m); });
-    if (hl.isUsed)
-        calcEffectiveField.emplace_back([this](MRef& m) { calcLocalField(m); });
+        calcEffectiveField.emplace_back([this](MRef&) { calcSweepField(); });
+    if (hp.rfIsUsed)
+        calcEffectiveField.emplace_back([this](MRef&) { calcRFField(); });
 }
 
 void TheLLG::evaluateAllEffectiveFields(MRef& Mag)
@@ -275,12 +276,12 @@ MatrixXd TheLLG::totalEffectiveField()
     for (i = 0; i < nx; ++i) {
         for (j = 0; j < 3; ++j) {
             Htot(i, j) = (Hexc(i,j) + Hku(i,j) + Hcub(i,j) + Hsurf(i,j) + Hdmi(i,j)) * invJs(i)
-                       + Hext(i,j) + Hdem(i,j) + Hpls(i,j) + Hswp(i,j) + Hloc(i,j);
+                       + Hext(i,j) + Hdem(i,j) + Hpls(i,j) + Hswp(i,j) + Hstat(i,j) + Hrf(i,j);
         }
     }
 #else
     MatrixXd Heff_tot = (Hexc + Hku + Hcub + Hsurf + Hdmi).array().colwise() * invJs.array();
-    Htot = Heff_tot + Hext + Hdem + Hpls + Hswp + Hloc;
+    Htot = Heff_tot + Hext + Hdem + Hpls + Hswp + Hstat + Hrf;
 #endif
     return Htot;
 }
@@ -340,19 +341,19 @@ void TheLLG::calcDMIField(MRef& Mag)
     }
 }
 
-void TheLLG::calcPulseField(MRef&)
+void TheLLG::calcPulseField()
 {
     Hpls = hp.pulseH * hp.gaussPulseValue(timeInPs);
 }
 
-void TheLLG::calcSweepField(MRef&)
+void TheLLG::calcSweepField()
 {
     Hswp = hp.sweepH * hp.sweepFieldValue(timeInPs);
 }
 
-void TheLLG::calcLocalField(MRef&)
+void TheLLG::calcRFField()
 {
-    Hloc = hl.localField(timeInPs);
+    Hrf = hp.rfH * hp.rfFieldValue(timeInPs);
 }
 
 
@@ -372,7 +373,7 @@ double TheLLG::getDirectExch(MRef& Mag)
 
 double TheLLG::getZeemanEnergy(MRef& Mag)
 {
-    double zeeEnergy = -(JsVol.transpose() * (Hext + Hpls + Hswp + Hloc).cwiseProduct(Mag)).sum();
+    double zeeEnergy = -(JsVol.transpose() * (Hext + Hpls + Hswp + Hstat + Hrf).cwiseProduct(Mag)).sum();
     return zeeEnergy;
 }
 
@@ -427,7 +428,7 @@ double TheLLG::getDirectDMI(MRef& Mag)
 
 Eigen::Vector3d TheLLG::getMeanH()
 {
-    return NodeVolume.transpose() * (Hext + Hpls + Hswp + Hloc) / totalVolume;
+    return NodeVolume.transpose() * (Hext + Hpls + Hswp + Hstat + Hrf) / totalVolume;
 }
 
 double TheLLG::getMaxTorque(MRef& Mag)
@@ -512,10 +513,21 @@ void TheLLG::setHdynField()
 {
     hp.pulseH = MatrixXd::Zero(nx, 3);
     hp.sweepH = MatrixXd::Zero(nx, 3);
-    if (hp.pulseIsUsed)
-        hp.pulseH = fieldFromAngles(nx, 1., hp.pulseTheta, hp.pulsePhi);
+    hp.rfH    = MatrixXd::Zero(nx, 3);
+    if (hp.pulseIsUsed) {
+        if (hp.pulseHasProfile)
+            hp.pulseH = hp.fieldProfile / PhysicalConstants::mu0;
+        else
+            hp.pulseH = fieldFromAngles(nx, 1., hp.pulseTheta, hp.pulsePhi);
+    }
     if (hp.sweepIsUsed)
         hp.sweepH = fieldFromAngles(nx, 1., hp.sweepTheta, hp.sweepPhi);
+    if (hp.rfIsUsed) {
+        if (hp.rfHasProfile)
+            hp.rfH = hp.fieldProfile / PhysicalConstants::mu0;
+        else
+            hp.rfH = fieldFromAngles(nx, 1., hp.rfTheta, hp.rfPhi);
+    }
 }
 
 void TheLLG::setMag(MRef& mag_)

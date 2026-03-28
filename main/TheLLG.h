@@ -119,10 +119,10 @@ private:
     Eigen::MatrixXd Hdmi;
     Eigen::MatrixXd Hpls;
     Eigen::MatrixXd Hswp;
-    Eigen::MatrixXd Hloc;
+    Eigen::MatrixXd Hstat;
+    Eigen::MatrixXd Hrf;
 
     Hdynamic hp;
-    Hlocal   hl;
 
     std::shared_ptr<EffFieldCalc>  efc;
     std::shared_ptr<DemagField>    demag;
@@ -163,9 +163,9 @@ private:
     void calcCubicAnisotropyField(MRef&);
     void calcSurfaceAnisotropyField(MRef&);
     void calcDMIField(MRef&);
-    void calcPulseField(MRef&);
-    void calcSweepField(MRef&);
-    void calcLocalField(MRef&);
+    void calcPulseField();
+    void calcSweepField();
+    void calcRFField();
 
     void setHdynField();
 

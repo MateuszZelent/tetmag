@@ -86,11 +86,10 @@ dev_vec TheLLG::sttDynamics_GPU(const dev_vec& mag_vec)
 
 Eigen::MatrixXd TheLLG::assembleCpuOnlyFields()
 {
-    const Eigen::MatrixXd dummy;
-    if (hp.pulseIsUsed) calcPulseField(dummy);
-    if (hp.sweepIsUsed) calcSweepField(dummy);
-    if (hl.isUsed)      calcLocalField(dummy);
-    return Hext + Hdem + Hpls + Hswp + Hloc;
+    if (hp.pulseIsUsed) calcPulseField();
+    if (hp.sweepIsUsed) calcSweepField();
+    if (hp.rfIsUsed)    calcRFField();
+    return Hext + Hdem + Hpls + Hswp + Hstat + Hrf;
 }
 
 void TheLLG::selectLLGTypeGPU(int choice)

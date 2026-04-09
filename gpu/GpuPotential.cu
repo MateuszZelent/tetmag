@@ -92,9 +92,9 @@ Matrix<value_type, Dynamic, 1> GpuPotential::calcDivM(const MatrixXd& mag) {
 	thrust::transform(my_dev->begin(), my_dev->end(), Js_dev->begin(), Jy->begin(), thrust::multiplies<double>());
 	thrust::transform(mz_dev->begin(), mz_dev->end(), Js_dev->begin(), Jz->begin(), thrust::multiplies<double>());
 
-	*x_tmp = tGradX_cuda->mvp(*Jx);
-	*y_tmp = tGradY_cuda->mvp(*Jy);
-	*z_tmp = tGradZ_cuda->mvp(*Jz);
+	tGradX_cuda->mvp(*Jx, *x_tmp);
+	tGradY_cuda->mvp(*Jy, *y_tmp);
+	tGradZ_cuda->mvp(*Jz, *z_tmp);
 
 	thrust::transform(
 			thrust::make_zip_iterator(thrust::make_tuple(x_tmp->begin(), y_tmp->begin(), z_tmp->begin() )),
@@ -109,9 +109,9 @@ Matrix<value_type, Dynamic, 1> GpuPotential::calcDivM(const MatrixXd& mag) {
 Matrix<value_type, Dynamic, Dynamic> GpuPotential::calcGradientField(const VectorXd& u){
 	thrust::copy(u.data(), u.data() + nx, u_dev->begin());
 
-	*x_tmp = gradX_cuda->mvp(*u_dev);
-	*y_tmp = gradY_cuda->mvp(*u_dev);
-	*z_tmp = gradZ_cuda->mvp(*u_dev);
+	gradX_cuda->mvp(*u_dev, *x_tmp);
+	gradY_cuda->mvp(*u_dev, *y_tmp);
+	gradZ_cuda->mvp(*u_dev, *z_tmp);
 
 	thrust::copy(x_tmp->begin(), x_tmp->end(), Hdem_vec.begin() );
 	thrust::copy(y_tmp->begin(), y_tmp->end(), Hdem_vec.begin() + nx );
@@ -120,4 +120,3 @@ Matrix<value_type, Dynamic, Dynamic> GpuPotential::calcGradientField(const Vecto
 	thrust::transform(Hdem_vec.begin(), Hdem_vec.end(), Hdem_vec.begin(), thrust::negate<value_type>());
 	return Map<const Matrix<value_type, Dynamic, Dynamic> >(Hdem_vec.data(), nx, 3);
 }
-

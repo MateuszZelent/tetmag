@@ -70,9 +70,9 @@ void EffFieldGPU::setCubicAnisotropy(const std::vector<Matrix3d>& cubicAxes, con
 
 Matrix<value_type, Dynamic, Dynamic> EffFieldGPU::ExchangeFieldGPU() {
 
-	*Hxcx_d = xc_cuda->mvp(*mx_d);
-	*Hxcy_d = xc_cuda->mvp(*my_d);
-	*Hxcz_d = xc_cuda->mvp(*mz_d);
+	xc_cuda->mvp(*mx_d, *Hxcx_d);
+	xc_cuda->mvp(*my_d, *Hxcy_d);
+	xc_cuda->mvp(*mz_d, *Hxcz_d);
 
 	copyTimer.start();
 	thrust::copy( Hxcx_d->begin(), Hxcx_d->end() , Hxc_unrolled.data() );
@@ -106,17 +106,17 @@ dev_vec EffFieldGPU::cwiseProduct(const dev_vec& v1, const dev_vec& v2) {
 
 Matrix<double, Dynamic, Dynamic> EffFieldGPU::UTermSTT_GPU() {
 
-  *u_xx = GradX_cuda->mvp(*mx_d);
-  *u_xy = GradY_cuda->mvp(*mx_d);
-  *u_xz = GradZ_cuda->mvp(*mx_d);
+  GradX_cuda->mvp(*mx_d, *u_xx);
+  GradY_cuda->mvp(*mx_d, *u_xy);
+  GradZ_cuda->mvp(*mx_d, *u_xz);
 
-  *u_yx = GradX_cuda->mvp(*my_d);
-  *u_yy = GradY_cuda->mvp(*my_d);
-  *u_yz = GradZ_cuda->mvp(*my_d);
+  GradX_cuda->mvp(*my_d, *u_yx);
+  GradY_cuda->mvp(*my_d, *u_yy);
+  GradZ_cuda->mvp(*my_d, *u_yz);
 
-  *u_zx = GradX_cuda->mvp(*mz_d);
-  *u_zy = GradY_cuda->mvp(*mz_d);
-  *u_zz = GradZ_cuda->mvp(*mz_d);
+  GradX_cuda->mvp(*mz_d, *u_zx);
+  GradY_cuda->mvp(*mz_d, *u_zy);
+  GradZ_cuda->mvp(*mz_d, *u_zz);
   
   *ju_xx = cwiseProduct( *eta_jx_d, *u_xx );
   *ju_xy = cwiseProduct( *eta_jy_d, *u_xy );
@@ -149,12 +149,12 @@ Matrix<double, Dynamic, Dynamic> EffFieldGPU::UTermSTT_GPU() {
 
 void EffFieldGPU::calcCurlM() {
 
-  *cmx1 = tGradY_cuda->mvp(*mz_d);
-  *cmx2 = tGradZ_cuda->mvp(*my_d);
-  *cmy1 = tGradZ_cuda->mvp(*mx_d);
-  *cmy2 = tGradX_cuda->mvp(*mz_d);
-  *cmz1 = tGradX_cuda->mvp(*my_d);
-  *cmz2 = tGradY_cuda->mvp(*mx_d);
+  tGradY_cuda->mvp(*mz_d, *cmx1);
+  tGradZ_cuda->mvp(*my_d, *cmx2);
+  tGradZ_cuda->mvp(*mx_d, *cmy1);
+  tGradX_cuda->mvp(*mz_d, *cmy2);
+  tGradX_cuda->mvp(*my_d, *cmz1);
+  tGradY_cuda->mvp(*mx_d, *cmz2);
 
   thrust::transform( cmx1->begin(), cmx1->end(), cmx2->begin(), curlM->begin(), thrust::minus<value_type>() );
   thrust::transform( cmy1->begin(), cmy1->end(), cmy2->begin(), curlM->begin() + nx, thrust::minus<value_type>() );
@@ -577,9 +577,9 @@ Matrix<double, Dynamic, Dynamic> EffFieldGPU::DMIField() {
 
 
 void EffFieldGPU::computeAndAccumulateHeff(bool useUniaxial, bool useDMI) {
-	*heffx_d = xc_cuda->mvp(*mx_d);
-	*heffy_d = xc_cuda->mvp(*my_d);
-	*heffz_d = xc_cuda->mvp(*mz_d);
+	xc_cuda->mvp(*mx_d, *heffx_d);
+	xc_cuda->mvp(*my_d, *heffy_d);
+	xc_cuda->mvp(*mz_d, *heffz_d);
 
 	if (useUniaxial) {
 		*kx_mx = cwiseProduct(*kuAxis_x, *mx_d);
@@ -666,4 +666,3 @@ void EffFieldGPU::NormalizeMag( MatrixXd& Mag, int nx ) {
 void EffFieldGPU::displayTimer() {
 	  std::cout << "GPU time for copying data [s]:\t" << copyTimer.durationInMus() / 1.e6 << std::endl;
 }
-

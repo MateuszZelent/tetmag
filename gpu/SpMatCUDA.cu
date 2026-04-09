@@ -89,7 +89,6 @@ void SpMatCUDA::setOnDev() {
   cusparseStatus_t status;
   dBuffer = NULL;
   bufferSize = 0;
-  VectorXd zero = VectorXd::Zero(rows);
 
   //	cusparseStatus_t status __attribute__ ((unused)) ; // this was in the old version.
 
@@ -103,18 +102,13 @@ void SpMatCUDA::setOnDev() {
   assert(status == CUSPARSE_STATUS_SUCCESS);
   checkStatusCusparse(status);
 
-  // prepare output vector:
-  cudaMalloc((void**) &dY, rows * sizeof(double));
-  cudaMemcpy(dY, zero.data(), rows * sizeof(double), cudaMemcpyHostToDevice);
-  cusparseCreateDnVec(&vecY, rows, dY, CUDA_R_64F);
+  devVecD xDummy(cols, 0.0);
+  devVecD yDummy(rows, 0.0);
+  cusparseCreateDnVec(&vecX, cols,
+                      thrust::raw_pointer_cast(xDummy.data()), CUDA_R_64F);
+  cusparseCreateDnVec(&vecY, rows,
+                      thrust::raw_pointer_cast(yDummy.data()), CUDA_R_64F);
 
-  // prepare input vector:
-  zero.resize(cols);
-  cudaMalloc((void**) &dX, cols * sizeof(double));
-  cudaMemcpy(dX, zero.data(), cols * sizeof(double), cudaMemcpyHostToDevice);
-  cusparseCreateDnVec(&vecX, cols, dX, CUDA_R_64F);
-
-  // prepare buffer:
   status = cusparseSpMV_bufferSize( handle, CUSPARSE_OPERATION_TRANSPOSE,
 				   &alpha, matA, vecX, &beta, vecY, CUDA_R_64F,
 #if (CUDART_VERSION > 11000)
@@ -122,13 +116,19 @@ void SpMatCUDA::setOnDev() {
 #else
                                    CUSPARSE_MV_ALG_DEFAULT, &bufferSize) ;
 #endif
-  
+
   checkStatusCusparse(status);
   cudaMalloc(&dBuffer, bufferSize);
 }
 
 
-void SpMatCUDA::mvp() {
+void SpMatCUDA::mvp(const devVecD& x, devVecD& y) {
+  assert(x.size() == static_cast<std::size_t>(cols));
+  assert(y.size() == static_cast<std::size_t>(rows));
+
+  cusparseDnVecSetValues(vecX, const_cast<double*>(thrust::raw_pointer_cast(x.data())));
+  cusparseDnVecSetValues(vecY, thrust::raw_pointer_cast(y.data()));
+
   cusparseStatus_t stat = cusparseSpMV(handle, CUSPARSE_OPERATION_TRANSPOSE,
 				       &alpha, matA, vecX, &beta, vecY, CUDA_R_64F,
 #if (CUDART_VERSION > 11000)
@@ -139,43 +139,13 @@ void SpMatCUDA::mvp() {
 //  checkStatusCusparse(stat);
 }
 
-
-devVecD SpMatCUDA::mvp(const devVecD& x) {
-	setX(x);
-	mvp();
-	return mvpResDev();
-}
-
-
-void SpMatCUDA::setX(const VectorXd& x) {
-  cudaMemcpy(dX, x.data(), x.size() * sizeof(double),  cudaMemcpyHostToDevice);
-}
-
-
-void SpMatCUDA::setX(const devVecD& x) {
-  cudaMemcpy(dX, thrust::raw_pointer_cast(x.data()), x.size() * sizeof(double),  cudaMemcpyDeviceToDevice);
-}
-
-
-VectorXd  SpMatCUDA::mvpResEig(){
-  VectorXd output(rows);
-   cudaMemcpy(output.data(), dY, rows * sizeof(double),  cudaMemcpyDeviceToHost);
-   return output;
-}
-
-
-devVecD SpMatCUDA::mvpResDev(){
-	return thrust::device_vector< double > (dY, dY + rows);
-}
-
-
 SpMatCUDA::~SpMatCUDA() {
-	cusparseDestroySpMat (matA);
-	cusparseDestroyDnVec (vecX);
-	cusparseDestroyDnVec (vecY);
-	cusparseDestroy (handle);
+	cusparseDestroyDnVec(vecX);
+	cusparseDestroyDnVec(vecY);
+	cusparseDestroySpMat(matA);
+	cusparseDestroy(handle);
+	cudaFree(dBuffer);
 	delete_vec(cscVals_d);
 	delete_vec(cscCols_d);
 	delete_vec(cscRows_d);
 }
-

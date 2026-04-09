@@ -64,16 +64,8 @@ private:
 public:
 	const double alpha; // SAXPY parameters
 	const double beta;
-	double *dY;  // output
-	double *dX;  // input
 	SpMatCUDA(const SpMat&);
-	void mvp();
-	void setX(const Eigen::VectorXd&);
-	void setX(const devVecD&);
-	void setX(const std::vector<double>&);
-	devVecD mvp(const devVecD&);
-	Eigen::VectorXd mvpResEig();
-	devVecD mvpResDev();
+	void mvp(const devVecD&, devVecD&);
 	SpMatCUDA();
 	virtual ~SpMatCUDA();
 };

@@ -81,11 +81,7 @@ DemagField::DemagField(const MeshData& msh, const VectorXd& Js_, bool useH2_ ) :
 	prepareNeumannMatrix();
 	dirichletMatrix.makeCompressed();
 
-	if (useH2) {
-		selectedMVPtype = [this](VectorXd& v) -> VectorXd { return h2MVP(v); };
-	} else {
-		selectedMVPtype = [this](VectorXd& v) -> VectorXd { return denseMVP(v); };
-	}
+	selectedMVPtype = useH2 ? &DemagField::h2MVP : &DemagField::denseMVP;
 }
 
 
@@ -148,7 +144,7 @@ VectorXd DemagField::denseMVP(VectorXd& v) {
 
 
 VectorXd DemagField::mvp(VectorXd& v) {
-	return selectedMVPtype(v);
+	return (this->*selectedMVPtype)(v);
 }
 
 

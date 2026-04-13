@@ -35,7 +35,6 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <string>
-#include <functional> // for std::function
 #include "SolverFactory.h"
 #include "MeshData.h"
 #ifdef USE_CUDA
@@ -70,7 +69,8 @@ private:
 	Eigen::VectorXd h2MVP(Eigen::VectorXd&);
 //	Eigen::VectorXd hMVP(Eigen::VectorXd&);
 	Eigen::VectorXd denseMVP(Eigen::VectorXd&);
-	std::function <Eigen::VectorXd ( Eigen::VectorXd& ) > selectedMVPtype;
+	using MVPfn = Eigen::VectorXd (DemagField::*)(Eigen::VectorXd&);
+	MVPfn selectedMVPtype;
 	Eigen::VectorXd mvp(Eigen::VectorXd&);
 	std::shared_ptr<SolverFactory> dirichletSolver;
 	std::shared_ptr<SolverFactory> neumannSolver;
